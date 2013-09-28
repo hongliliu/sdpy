@@ -13,12 +13,25 @@ try:
 except ImportError:
     pass
 import os
-from agpy import timer
 import copy
 try:
     from progressbar import ProgressBar
 except ImportError:
     pass
+
+import time
+from functools import wraps
+
+def print_timing(func):
+    @wraps(func)
+    def wrapper(*arg,**kwargs):
+        t1 = time.time()
+        res = func(*arg,**kwargs)
+        t2 = time.time()
+        print '%s took %0.5g s' % (func.func_name, (t2-t1))
+        return res
+    return wrapper
+
 
 def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
         coordsys='galactic', ctype3='RADI-LSR', bmaj=0.138888, bmin=0.138888,
@@ -74,6 +87,7 @@ def make_blank_images(cubeprefix, flatheader='header.txt',
     naxis1,naxis2,naxis3 = header.get('NAXIS1'),header.get('NAXIS2'),header.get('NAXIS3')
     blankcube = np.zeros([naxis3,naxis2,naxis1])
     blanknhits = np.zeros([naxis2,naxis1])
+    print "Blank image size: ",naxis1,naxis2,naxis3,".  Blankcube shape: ",blankcube.shape
     file1 = pyfits.PrimaryHDU(header=header,data=blankcube)
     file1.writeto(cubeprefix+".fits",clobber=clobber)
     file2 = pyfits.PrimaryHDU(header=flathead,data=blanknhits)
@@ -113,7 +127,7 @@ def coord_iterator(data,coordsys_out='galactic'):
             if coordsys_out == 'galactic':
                 yield data.GLON[ii],data.GLAT[ii]
             elif coordsys_out in ('celestial','radec'):
-                pos = coords.Position([data.GLON[ii],data.GLAT[ii]],coordsys_out='galactic')
+                pos = coords.Position([data.GLON[ii],data.GLAT[ii]],system='galactic')
                 ra,dec = pos.j2000()
                 yield ra,dec
     elif hasattr(data,'CRVAL2') and hasattr(data,'CRVAL3'):
@@ -154,7 +168,9 @@ def velo_iterator(data,linefreq=None):
                 # relative to the observed, rather than the rest freq, since we don't make
                 # corrections for LSR.  I undid this, though, since it seemed to erase signal...
                 # it may have misaligned data from different sessions.  Odd.
-                freqarr = (np.arange(npix)+1-CRPIX)*deltaf + restfreq # obsfreq #
+                #freqarr = (np.arange(npix)+1-CRPIX)*deltaf + restfreq # obsfreq #
+                # trying again, since 2-2 clearly offset from 1-1
+                freqarr = (np.arange(npix)+1-CRPIX)*deltaf + obsfreq
                 velo = (linefreq-freqarr)/linefreq * 2.99792458e5
                 #obsfreq = data.OBSFREQ[ii]
                 #cenfreq = obsfreq + (linefreq-restfreq)
@@ -170,7 +186,7 @@ def velo_iterator(data,linefreq=None):
 
 def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
         dataarr=None, obsmode=None, exclude_velo=(), interp_polyorder=5,
-        interp_vrange=(), linefreq=None, return_uninterp=False, extension=1):
+        percentile=50, interp_vrange=(), linefreq=None, return_uninterp=False):
     """
     Create an 'off' spectrum from a large collection of data by taking
     the median across time (or fitting across time?) and interpolating across certain
@@ -199,12 +215,16 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
         Range of velocities to interpolate over (don't use whole spectrum -
         leads to bad fits)
     linefreq : float
-        Line frequency reference for velocity 
+        Line frequency reference for velocity
+    percentile : float
+        The percentile of the data to use for the reference.  Normally, you
+        would use 50 to get the median of the data, but if there is emission at
+        all positions, you might choose, e.g., 25, or absorption, 75.
 
     Returns
     -------
     off_template (interpolated) : np.ndarray
-        a NORMALIZED off spectrum 
+        a NORMALIZED off spectrum
     off_template_in : np.ndarray [OPTIONAL]
         if return_uninterp is set, the "average" off position (not
         interpolated) will be returned
@@ -240,24 +260,8 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
 
     #    namelist = data.keys()
 
-    samplers = np.unique(data['SAMPLER'])
-    if isinstance(sampler,int): sampler = samplers[sampler]
-
-    OK = data['SAMPLER'] == sampler
-    OK *= data['FEED'] == feednum
-    # np.isfinite = True or False.  If *any* are not finite, min should return 0
-    OK *= np.isfinite(data['DATA']).min(axis=1)
-    if OK.sum() == 0:
-        raise ValueError("No matches found for feed %i and sampler %s" % (feednum,sampler))
-    OKsource = OK.copy()
-    if sourcename is not None:
-        OKsource *= (data['OBJECT'] == sourcename)
-    if scanrange is not []:
-        OKsource *= (scanrange[0] < data['SCAN'])*(data['SCAN'] < scanrange[1])
-    if obsmode is not None:
-        OKsource *= ((obsmode == data.OBSMODE) + ((obsmode+":NONE:TPWCAL") == data.OBSMODE))
-    if sourcename is None and scanrange is None:
-        raise IndexError("Must specify a source name and/or a scan range")
+    OK, OKsource = selectsource(data, sampler, feednum=feednum,
+                                sourcename=sourcename, scanrange=scanrange)
 
     nspec = OKsource.sum()
     if nspec == 0:
@@ -277,8 +281,8 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
 
     scan_means_on = dataarr[OKsource*CalOn].mean(axis=1)
     scan_means_off = dataarr[OKsource*CalOff].mean(axis=1)
-    medon = np.median(dataarr[OKsource*CalOn].T / scan_means_on, axis=1)
-    medoff = np.median(dataarr[OKsource*CalOff].T / scan_means_off, axis=1)
+    medon = np.percentile(dataarr[OKsource*CalOn].T / scan_means_on, percentile, axis=1)
+    medoff = np.percentile(dataarr[OKsource*CalOff].T / scan_means_off, percentile, axis=1)
     off_template = np.mean([medon,medoff],axis=0)
 
     velo = velo_iterator(data,linefreq=linefreq).next()
@@ -305,8 +309,30 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
         return off_template
     
 
+def selectsource(data, sampler, sourcename=None, obsmode=None, scanrange=[],
+                 feednum=1):
+
+    samplers = np.unique(data['SAMPLER'])
+    if isinstance(sampler,int):
+        sampler = samplers[sampler]
+
+    OK = data['SAMPLER'] == sampler
+    OK *= data['FEED'] == feednum
+    OK *= np.isfinite(data['DATA'].sum(axis=1))
+    OKsource = OK.copy()
+    if sourcename is not None:
+        OKsource *= (data['OBJECT'] == sourcename)
+    if scanrange is not []:
+        OKsource *= (scanrange[0] < data['SCAN'])*(data['SCAN'] < scanrange[1])
+    if obsmode is not None:
+        OKsource *= ((obsmode == data.OBSMODE) + ((obsmode+":NONE:TPWCAL") == data.OBSMODE))
+    if sourcename is None and scanrange is None:
+        raise IndexError("Must specify a source name and/or a scan range")
+
+    return OK,OKsource
+
 @timer.print_timing
-def calibrate_cube_data(fitsfile, outfilename, scanrange=[], refscan1=0,
+def calibrate_cube_data(filename, outfilename, scanrange=[], refscan1=0,
         refscan2=0, sourcename=None, feednum=1, sampler=0, return_data=False,
         filepyfits=None, datapfits=None, dataarr=None, clobber=True, tau=0.0,
         obsmode=None, refscans=None, off_template=None, flag_neg_tsys=True,
@@ -626,6 +652,7 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
     # back to zero
     image[image!=image] = 0.0
     header = pyfits.getheader(cubefilename)
+    # debug print "Cube shape: ",image.shape," naxis3: ",header.get('NAXIS3')," nhits shape: ",nhits.shape
 
     if debug > 0:
         print "Image statistics: mean, std, nzeros, size",image.mean(),image.std(),np.sum(image==0), image.size
@@ -642,14 +669,20 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
 
     if velocityrange is not None:
         v1,v4 = velocityrange
-        ind1 = np.argmin(np.abs(velocityrange[0]-cubevelo))
-        ind2 = np.argmin(np.abs(velocityrange[1]-cubevelo))
-        print "Updating CRPIX3 from %i to %i" % (header.get('CRPIX3'),header.get('CRPIX3')-ind1)
+        ind1 = np.argmin(np.abs(np.floor(v1-cubevelo)))
+        ind2 = np.argmin(np.abs(np.ceil(v4-cubevelo)))+1
+        # stupid hack.  REALLY stupid hack.  Don't crop.
+        if np.abs(ind2-image.shape[0]) < 5: ind2 = image.shape[0]
+        if np.abs(ind1) < 5: ind1 = 0
+        #print "Velo match for v1,v4 = %f,%f: %f,%f" % (v1,v4,cubevelo[ind1],cubevelo[ind2])
+        print "Updating CRPIX3 from %i to %i. Cropping to indices %i,%i" % (header.get('CRPIX3'),header.get('CRPIX3')-ind1,ind1,ind2)
         header.update('CRPIX3',header.get('CRPIX3')-ind1)
     else:
         ind1=0
         ind2 = image.shape[0]
         v1,v4 = min(cubevelo),max(cubevelo)
+
+    # debug print "Cube has %i v-axis pixels from %f to %f.  Crop range is %f to %f" % (naxis3,cubevelo.min(),cubevelo.max(),v1,v4)
 
     #if abs(cdelt) < abs(cd3):
     #    print "Spectra have CD=%0.2f, cube has CD=%0.2f.  Will smooth & interpolate." % (cdelt,cd3)
@@ -807,6 +840,9 @@ try:
         cubefile[0].data = tau
         cubefile[0].header['BUNIT']='tau'
         cubefile.writeto(cubename.replace("cube","taucube")+".fits",clobber=True)
+        cubefile[0].data = tau.sum(axis=0)
+        cubefile[0].header['BUNIT']='tau km/s'
+        cubefile.writeto(cubename.replace("cube","taucube_integrated")+".fits",clobber=True)
 
 except:
     pass
