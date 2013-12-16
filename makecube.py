@@ -331,7 +331,7 @@ def selectsource(data, sampler, sourcename=None, obsmode=None, scanrange=[],
 
     return OK,OKsource
 
-@timer.print_timing
+@print_timing
 def calibrate_cube_data(filename, outfilename, scanrange=[], refscan1=0,
         refscan2=0, sourcename=None, feednum=1, sampler=0, return_data=False,
         filepyfits=None, datapfits=None, dataarr=None, clobber=True, tau=0.0,
