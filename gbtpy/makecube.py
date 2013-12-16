@@ -778,7 +778,7 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
                 # Do not include the excluded regions
                 include[i1:i2] = False
 
-        imdiagnostics(data['DATA'][include,:],ax=pl.gca())
+        imdiagnostics(data['DATA'][include,:],axis=pylab.gca())
         pylab.savefig(diagnostic_plot_name, bbox_inches='tight')
         print "Saved diagnostic plot ",diagnostic_plot_name
 
