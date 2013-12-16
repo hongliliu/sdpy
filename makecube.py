@@ -719,7 +719,24 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
             else:
                 datavect = np.interp(cubevelo,velo,spectrum)
             OK = (datavect[ind1:ind2] == datavect[ind1:ind2])
-            if datavect[ind1:ind2][OK].std() > noisecut:
+
+            if excludefitrange is None:
+                noiseestimate = datavect[ind1:ind2][OK].std()
+            else:
+                # Exclude certain regions (e.g., the spectral lines) when computing the noise
+                include = OK.copy()
+
+                # Convert velocities to indices
+                exclude_inds = [np.argmin(np.abs(np.floor(v-cubevelo))) for v in excludefitrange]
+
+                # Loop through exclude_inds pairwise
+                for (i1,i2) in zip(exclude_inds[:-1],exclude_inds[1:]):
+                    # Do not include the excluded regions
+                    include[i1:i2] = False
+
+                noiseestimate = datavect[ind1:ind2][include].std()
+
+            if noiseestimate > noisecut:
                 print "Skipped a data point at %f,%f in file %s because it had excessive noise %f" % (x,y,filename,datavect[ind1:ind2][OK].std())
                 continue
             elif OK.sum() == 0:
