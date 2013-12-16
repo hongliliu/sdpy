@@ -761,7 +761,24 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
     if diagnostic_plot_name:
         from mpl_plot_templates import imdiagnostics
         pylab.clf()
-        imdiagnostics(data[ind1:ind2,:][include,:],ax=pl.gca())
+        ind1 = np.argmin(np.abs(np.floor(v1-velo)))
+        ind2 = np.argmin(np.abs(np.ceil(v4-velo)))+1
+        OK = (data['DATA'][:,0]==data['DATA'][:,0])
+        OK[:ind1] = False
+        OK[ind2:] = False
+
+        if excludefitrange is not None:
+            include = OK
+
+            # Convert velocities to indices
+            exclude_inds = [np.argmin(np.abs(np.floor(v-velo))) for v in excludefitrange]
+
+            # Loop through exclude_inds pairwise
+            for (i1,i2) in zip(exclude_inds[:-1],exclude_inds[1:]):
+                # Do not include the excluded regions
+                include[i1:i2] = False
+
+        imdiagnostics(data['DATA'][include,:],ax=pl.gca())
         pylab.savefig(diagnostic_plot_name, bbox_inches='tight')
         print "Saved diagnostic plot ",diagnostic_plot_name
 
