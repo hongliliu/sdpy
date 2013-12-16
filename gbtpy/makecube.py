@@ -758,11 +758,11 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
         #import pdb; pdb.set_trace()
         #raise Exception
 
-        if diagnostic_plot_name:
-            from mpl_plot_templates import imdiagnostics
-            pylab.clf()
-            imdiagnostics(data[ind1:ind2,:][include,:],ax=pl.gca())
-            pylab.savefig(diagnostic_plot_name, bbox_inches='tight')
+    if diagnostic_plot_name:
+        from mpl_plot_templates import imdiagnostics
+        pylab.clf()
+        imdiagnostics(data[ind1:ind2,:][include,:],ax=pl.gca())
+        pylab.savefig(diagnostic_plot_name, bbox_inches='tight')
 
     if debug > 0:
         print "nhits statistics: mean, std, nzeros, size",nhits.mean(),nhits.std(),np.sum(nhits==0), nhits.size
