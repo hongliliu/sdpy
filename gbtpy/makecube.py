@@ -618,6 +618,7 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
         velo_iterator=velo_iterator, debug=False,
         progressbar=False, coordsys='galactic',
         velocity_offset=0.0,
+        negative_mean_cut=None,
         fsw=False, diagnostic_plot_name=None):
     """ 
     Given a .fits file that contains a binary table of spectra (e.g., as
@@ -692,6 +693,8 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
     else:
         pb = lambda x: x
 
+    skipped = []
+
     for spectrum,pos,velo in pb(zip(data_iterator(data,fsw=fsw),
                                     coord_iterator(data,coordsys_out=coordsys),
                                     velo_iterator(data,linefreq=linefreq))):
@@ -730,20 +733,31 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
                 exclude_inds = [np.argmin(np.abs(np.floor(v-cubevelo))) for v in excludefitrange]
 
                 # Loop through exclude_inds pairwise
-                for (i1,i2) in zip(exclude_inds[:-1],exclude_inds[1:]):
+                for (i1,i2) in zip(exclude_inds[:-1:2],exclude_inds[1::2]):
                     # Do not include the excluded regions
                     include[i1:i2] = False
 
+                if include.sum() == 0:
+                    raise ValueError("All data excluded.")
+
             noiseestimate = datavect[ind1:ind2][include].std()
+            contestimate = datavect[ind1:ind2][include].mean()
 
             if noiseestimate > noisecut:
-                print "Skipped a data point at %f,%f in file %s because it had excessive noise %f" % (x,y,filename,datavect[ind1:ind2][OK].std())
+                print "Skipped a data point at %f,%f in file %s because it had excessive noise %f" % (x,y,filename,noiseestimate)
+                skipped.append(True)
+                continue
+            elif negative_mean_cut is not None and contestimate < negative_mean_cut:
+                print "Skipped a data point at %f,%f in file %s because it had negative continuum %f" % (x,y,filename,contestimate)
+                skipped.append(True)
                 continue
             elif OK.sum() == 0:
                 print "Skipped a data point at %f,%f in file %s because it had NANs" % (x,y,filename)
+                skipped.append(True)
                 continue
             elif OK.sum()/float(abs(ind2-ind1)) < 0.5:
                 print "Skipped a data point at %f,%f in file %s because it had %i NANs" % (x,y,filename,np.isnan(datavect[ind1:ind2]).sum() )
+                skipped.append(True)
                 continue
             if debug > 2:
                 print "did not skip...",
@@ -753,7 +767,9 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
                 if debug > 2:
                     print "Z-axis indices are ",ind1,ind2,"...",
                     print "Added a data point at ",int(np.round(x)),int(np.round(y)),"!"
+                skipped.append(False)
             else:
+                skipped.append(True)
                 print "Skipped a data point at %f,%f in file %s because it's out of the grid" % (x,y,filename)
         #import pdb; pdb.set_trace()
         #raise Exception
@@ -761,11 +777,11 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
     if diagnostic_plot_name:
         from mpl_plot_templates import imdiagnostics
         pylab.clf()
-        ind1 = np.argmin(np.abs(np.floor(v1-velo)))
-        ind2 = np.argmin(np.abs(np.ceil(v4-velo)))+1
+        ind1a = np.argmin(np.abs(np.floor(v1-velo)))
+        ind2a = np.argmin(np.abs(np.ceil(v4-velo)))+1
         OK = (data['DATA'][:,0]==data['DATA'][:,0])
-        OK[:ind1] = False
-        OK[ind2:] = False
+        OK[:ind1a] = False
+        OK[ind2a:] = False
 
         if excludefitrange is not None:
             include = OK
@@ -774,13 +790,28 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
             exclude_inds = [np.argmin(np.abs(np.floor(v-velo))) for v in excludefitrange]
 
             # Loop through exclude_inds pairwise
-            for (i1,i2) in zip(exclude_inds[:-1],exclude_inds[1:]):
+            for (i1,i2) in zip(exclude_inds[:-1:2],exclude_inds[1::2]):
                 # Do not include the excluded regions
                 include[i1:i2] = False
 
-        imdiagnostics(data['DATA'][:,include],axis=pylab.gca())
+            if include.sum() == 0:
+                raise ValueError("All data excluded.")
+
+        dd = data['DATA'][:,include]
+        imdiagnostics(dd,axis=pylab.gca())
         pylab.savefig(diagnostic_plot_name, bbox_inches='tight')
-        print "Saved diagnostic plot ",diagnostic_plot_name
+
+        # Save a copy with the bad stuff flagged out; this should tell whether flagging worked
+        skipped = np.array(skipped,dtype='bool')
+        dd[skipped,:] = -999
+        maskdata = np.ma.masked_equal(dd,-999)
+        pylab.clf()
+        imdiagnostics(maskdata, axis=pylab.gca())
+        dpn_pre,dpn_suf = os.path.splitext(diagnostic_plot_name)
+        dpn_flagged = dpn_pre+"_flagged"+dpn_suf
+        pylab.savefig(dpn_flagged, bbox_inches='tight')
+
+        print "Saved diagnostic plot ",diagnostic_plot_name," and ",dpn_flagged
 
     if debug > 0:
         print "nhits statistics: mean, std, nzeros, size",nhits.mean(),nhits.std(),np.sum(nhits==0), nhits.size
