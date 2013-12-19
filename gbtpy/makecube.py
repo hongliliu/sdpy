@@ -34,7 +34,7 @@ def print_timing(func):
 
 
 def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
-        coordsys='galactic', ctype3='RADI-LSR', bmaj=0.138888, bmin=0.138888,
+        coordsys='galactic', ctype3='VELO-LSR', bmaj=0.138888, bmin=0.138888,
         pixsize=24, cunit3='km/s', output_flatheader='header.txt',
         output_cubeheader='cubeheader.txt', cd3=1.0, crval3=0.0,
         clobber=False, bunit="K", restfreq=None):
@@ -45,6 +45,9 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
     header.update('CD1_1',-1*pixsize/3600.0)
     header.update('CD2_2',pixsize/3600.0)
     header.update('EQUINOX',2000.0)
+    header.update('VELREF','257') # CASA convention:
+    # VELREF  =                  259 /1 LSR, 2 HEL, 3 OBS, +256 Radio
+    # COMMENT casacore non-standard usage: 4 LSD, 5 GEO, 6 SOU, 7 GAL
     if restfreq:
         header.update('RESTFRQ',restfreq)
     if coordsys == 'galactic':
@@ -776,10 +779,13 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
 
     if diagnostic_plot_name:
         from mpl_plot_templates import imdiagnostics
+
+        dname = 'DATA' if 'DATA' in data.dtype.names else 'SPECTRA'
+
         pylab.clf()
         ind1a = np.argmin(np.abs(np.floor(v1-velo)))
         ind2a = np.argmin(np.abs(np.ceil(v4-velo)))+1
-        OK = (data['DATA'][:,0]==data['DATA'][:,0])
+        OK = (data[dname][0,:]==data[dname][0,:])
         OK[:ind1a] = False
         OK[ind2a:] = False
 
@@ -797,7 +803,7 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
             if include.sum() == 0:
                 raise ValueError("All data excluded.")
 
-        dd = data['DATA'][:,include]
+        dd = data[dname][:,include]
         imdiagnostics(dd,axis=pylab.gca())
         pylab.savefig(diagnostic_plot_name, bbox_inches='tight')
 
