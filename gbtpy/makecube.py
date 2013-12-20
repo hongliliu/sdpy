@@ -906,7 +906,7 @@ def _fix_ms_kms_header(header):
     return header
 
 def _fix_ms_kms_file(filename):
-    f = fits.open(filename)
+    f = pyfits.open(filename)
     f[0].header = _fix_ms_kms_header(f[0].header)
     f.writeto(filename,clobber=True)
 
