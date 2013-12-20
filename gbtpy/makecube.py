@@ -775,11 +775,15 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
                     kernel_size = kd = 5
                     kernel_middle = mid = (kd-1)/2.
                     xinds,yinds = (np.mgrid[:kd,:kd]-mid+np.array([np.round(x),np.round(y)])[:,None,None]).astype('int')
-                    kernel = np.exp(-((xinds-(x%1))**2+(yinds-(y%1))**2)/(2*(kernel_fwhm/2.35/cd)**2))
-                    dim1 = OK.sum()
-                    vect_to_add = np.outer(datavect[ind1:ind2][OK],kernel).reshape([dim1,kd,kd])
-                    image[ind1:ind2,yinds,xinds][OK] += vect_to_add
-                    nhits[yinds,xinds] += kernel
+                    kernel2d = np.exp(-((xinds-x)**2+(yinds-y))**2/(2*(kernel_fwhm/2.35/cd)**2))
+
+                    dim1 = datavect.shape[0]
+                    vect_to_add = np.outer(datavect[ind1:ind2],kernel2d).reshape([dim1,kd,kd])
+                    vect_to_add[True-OK] = 0
+
+                    image[ind1:ind2,yinds,xinds] += vect_to_add
+                    # NaN spectral bins are not appropriately downweighted... but they shouldn't exist anyway...
+                    nhits[yinds,xinds] += kernel2d
 
                 else:
                     image[ind1:ind2,int(np.round(y)),int(np.round(x))][OK]  += datavect[ind1:ind2][OK]
