@@ -45,6 +45,7 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
     header.update('CD1_1',-1*pixsize/3600.0)
     header.update('CD2_2',pixsize/3600.0)
     header.update('EQUINOX',2000.0)
+    header.update('SPECSYS','LSRK')
     header.update('VELREF','257') # CASA convention:
     # VELREF  =                  259 /1 LSR, 2 HEL, 3 OBS, +256 Radio
     # COMMENT casacore non-standard usage: 4 LSD, 5 GEO, 6 SOU, 7 GAL
@@ -885,11 +886,29 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
 
     if do_runscript: runscript(outpre)
 
+    _fix_ms_kms_file(outpre+"_sub.fits")
+    _fix_ms_kms_file(outpre+"_smooth.fits")
+
 def runscript(outpre):
     if outpre[0] != "/":
         os.system("./"+outpre+"_starlink.sh")
     else:
         os.system(outpre+"_starlink.sh")
+
+def _fix_ms_kms_header(header):
+    if header['CUNIT3'] == 'm/s':
+        header['CUNIT3'] = 'km/s'
+        header['CRVAL3'] /= 1e3
+        if 'CD3_3' in header:
+            header['CD3_3'] /= 1e3
+        else:
+            header['CDELT3'] /= 1e3
+    return header
+
+def _fix_ms_kms_file(filename):
+    f = fits.open(filename)
+    f[0].header = _fix_ms_kms_header(f[0].header)
+    f.writeto(filename,clobber=True)
 
 try:
     # requires agpy.  Might not work
@@ -897,6 +916,7 @@ try:
 
     def make_flats(cubename,vrange=[0,10],noisevrange=[-100,-50],suffix='_sub.fits'):
         cubefile = pyfits.open(cubename+suffix)
+        cubefile[0].header = _fix_ms_kms_header(cubefile[0].header)
         flathead = cubes.flatten_header(cubefile[0].header)
         integrated = cubes.integ(cubefile,vrange,zunits='wcs')[0]
         flatimg = pyfits.PrimaryHDU(data=integrated,header=flathead)
@@ -910,6 +930,7 @@ try:
 
     def make_taucube(cubename,continuum=0.0,continuum_units='K',TCMB=2.7315, etamb=1.):
         cubefile = pyfits.open(cubename+"_sub.fits")
+        cubefile[0].header = _fix_ms_kms_header(cubefile[0].header)
         if type(continuum) is str:
             continuum = pyfits.getdata(continuum)
         if cubefile[0].header.get('BUNIT') != continuum_units:
