@@ -623,6 +623,8 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
         progressbar=False, coordsys='galactic',
         velocity_offset=0.0,
         negative_mean_cut=None,
+        add_with_kernel=False,
+        kernel_fwhm=None,
         fsw=False, diagnostic_plot_name=None):
     """ 
     Given a .fits file that contains a binary table of spectra (e.g., as
@@ -671,6 +673,9 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
     wcs = pywcs.WCS(flathead)
     cd3 = header.get('CD3_3')
     cubevelo = (np.arange(naxis3)+1-header.get('CRPIX3'))*cd3 + header.get('CRVAL3')
+
+    if add_with_kernel:
+        cd = np.abs(wcs.wcs.cd[1,1])
 
     if velocityrange is not None:
         v1,v4 = velocityrange
@@ -766,8 +771,20 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
             if debug > 2:
                 print "did not skip...",
             if 0 < int(np.round(x)) < naxis1 and 0 < int(np.round(y)) < naxis2:
-                image[ind1:ind2,int(np.round(y)),int(np.round(x))][OK]  += datavect[ind1:ind2][OK]
-                nhits[int(np.round(y)),int(np.round(x))]     += 1
+                if add_with_kernel:
+                    kernel_size = kd = 5
+                    kernel_middle = mid = (kd-1)/2.
+                    xinds,yinds = (np.mgrid[:kd,:kd]-mid+np.array([np.round(x),np.round(y)])[:,None,None]).astype('int')
+                    kernel = np.exp(-((xinds-(x%1))**2+(yinds-(y%1))**2)/(2*(kernel_fwhm/2.35/cd)**2))
+                    dim1 = OK.sum()
+                    vect_to_add = np.outer(datavect[ind1:ind2][OK],kernel).reshape([dim1,kd,kd])
+                    image[ind1:ind2,yinds,xinds][OK] += vect_to_add
+                    nhits[yinds,xinds] += kernel
+
+                else:
+                    image[ind1:ind2,int(np.round(y)),int(np.round(x))][OK]  += datavect[ind1:ind2][OK]
+                    nhits[int(np.round(y)),int(np.round(x))]     += 1
+
                 if debug > 2:
                     print "Z-axis indices are ",ind1,ind2,"...",
                     print "Added a data point at ",int(np.round(x)),int(np.round(y)),"!"
@@ -860,28 +877,31 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
     HDU2.writeto(outpre+"_nhits.fits",clobber=True,output_verify='fix')
 
     scriptfile = open(outpre+"_starlink.sh",'w')
+    outpath,outfn = os.path.split(cubefilename)
+    outpath,pre = os.path.split(outpre)
     print >>scriptfile,("#!/bin/bash")
+    print >>scriptfile,('cd %s' % outpath)
     print >>scriptfile,('. /star/etc/profile')
     print >>scriptfile,('kappa > /dev/null')
     print >>scriptfile,('convert > /dev/null')
-    print >>scriptfile,('fits2ndf %s %s' % (cubefilename,cubefilename.replace(".fits",".sdf")))
+    print >>scriptfile,('fits2ndf %s %s' % (outfn,outfn.replace(".fits",".sdf")))
     if excludefitrange is not None:
         v2v3 = ""
         for v2,v3 in zip(excludefitrange[::2],excludefitrange[1::2]):
             v2v3 += "%0.2f %0.2f " % (v2,v3)
-        print >>scriptfile,('mfittrend %s  ranges=\\\"%0.2f %s %0.2f\\\" order=%i axis=3 out=%s' % (cubefilename.replace(".fits",".sdf"),v1,v2v3,v4,baselineorder,cubefilename.replace(".fits","_baseline.sdf")))
+        print >>scriptfile,('mfittrend %s  ranges=\\\"%0.2f %s %0.2f\\\" order=%i axis=3 out=%s' % (outfn.replace(".fits",".sdf"),v1,v2v3,v4,baselineorder,outfn.replace(".fits","_baseline.sdf")))
     else:
-        print >>scriptfile,('mfittrend %s  ranges=\\\"%0.2f %0.2f\\\" order=%i axis=3 out=%s' % (cubefilename.replace(".fits",".sdf"),v1,v4,baselineorder,cubefilename.replace(".fits","_baseline.sdf")))
-    print >>scriptfile,('sub %s %s %s' % (cubefilename.replace(".fits",".sdf"),cubefilename.replace(".fits","_baseline.sdf"),cubefilename.replace(".fits","_sub.sdf")))
-    print >>scriptfile,('sqorst %s_sub mode=pixelscale  axis=3 pixscale=%i out=%s_vrebin' % (outpre,smoothto,outpre))
-    print >>scriptfile,('gausmooth %s_vrebin fwhm=1.0 axes=[1,2] out=%s_smooth' % (outpre,outpre))
-    print >>scriptfile,('#collapse %s estimator=mean axis="RADI-LSR" low=-400 high=500 out=%s_continuum' % (outpre,outpre))
-    print >>scriptfile,('rm %s_sub.fits' % (outpre))
-    print >>scriptfile,('ndf2fits %s_sub %s_sub.fits' % (outpre,outpre))
-    print >>scriptfile,('rm %s_smooth.fits' % (outpre))
-    print >>scriptfile,('ndf2fits %s_smooth %s_smooth.fits' % (outpre,outpre))
+        print >>scriptfile,('mfittrend %s  ranges=\\\"%0.2f %0.2f\\\" order=%i axis=3 out=%s' % (outfn.replace(".fits",".sdf"),v1,v4,baselineorder,outfn.replace(".fits","_baseline.sdf")))
+    print >>scriptfile,('sub %s %s %s' % (outfn.replace(".fits",".sdf"),outfn.replace(".fits","_baseline.sdf"),outfn.replace(".fits","_sub.sdf")))
+    print >>scriptfile,('sqorst %s_sub mode=pixelscale  axis=3 pixscale=%i out=%s_vrebin' % (pre,smoothto,pre))
+    print >>scriptfile,('gausmooth %s_vrebin fwhm=1.0 axes=[1,2] out=%s_smooth' % (pre,pre))
+    print >>scriptfile,('#collapse %s estimator=mean axis="RADI-LSR" low=-400 high=500 out=%s_continuum' % (pre,pre))
+    print >>scriptfile,('rm %s_sub.fits' % (pre))
+    print >>scriptfile,('ndf2fits %s_sub %s_sub.fits' % (pre,pre))
+    print >>scriptfile,('rm %s_smooth.fits' % (pre))
+    print >>scriptfile,('ndf2fits %s_smooth %s_smooth.fits' % (pre,pre))
     print >>scriptfile,("# Fix STARLINK's failure to respect header keywords.")
-    print >>scriptfile,('sethead %s_smooth.fits RESTFRQ=`gethead RESTFRQ %s.fits`' % (outpre,outpre))
+    print >>scriptfile,('sethead %s_smooth.fits RESTFRQ=`gethead RESTFRQ %s.fits`' % (pre,pre))
     scriptfile.close()
 
     if do_runscript: runscript(outpre)
