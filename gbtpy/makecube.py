@@ -724,7 +724,7 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
                 print "At point ",x,y," ...",
             if abs(cdelt) < abs(cd3) and allow_smooth:
                 # need to smooth before interpolating to preserve signal
-                kernel = np.exp(-(np.linspace(-5,5,11)**2)/(2.0*abs(cd3/cdelt)))
+                kernel = np.exp(-(np.linspace(-5,5,11)**2)/(2.0*abs(cd3/cdelt/2.35)**2))
                 kernel /= kernel.sum()
                 smspec = np.convolve(spectrum,kernel,mode='same')
                 datavect = np.interp(cubevelo,velo,smspec)
