@@ -625,7 +625,8 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
         negative_mean_cut=None,
         add_with_kernel=False,
         kernel_fwhm=None,
-        fsw=False, diagnostic_plot_name=None):
+        fsw=False, diagnostic_plot_name=None,
+        chmod=False):
     """ 
     Given a .fits file that contains a binary table of spectra (e.g., as
     you would get from the GBT mapping "pipeline" or the reduce_map.pro aoidl
@@ -907,6 +908,9 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
     print >>scriptfile,("# Fix STARLINK's failure to respect header keywords.")
     print >>scriptfile,('sethead %s_smooth.fits RESTFRQ=`gethead RESTFRQ %s.fits`' % (pre,pre))
     scriptfile.close()
+
+    if chmod:
+        os.system("chmod +x "+scriptfile)
 
     if do_runscript: runscript(outpre)
 
