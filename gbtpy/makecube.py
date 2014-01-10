@@ -910,7 +910,7 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
     scriptfile.close()
 
     if chmod:
-        os.system("chmod +x "+scriptfile)
+        os.system("chmod +x "+outpre+"_starlink.sh")
 
     if do_runscript: runscript(outpre)
 
