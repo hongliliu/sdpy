@@ -947,6 +947,8 @@ try:
         cubefile[0].header = _fix_ms_kms_header(cubefile[0].header)
         flathead = cubes.flatten_header(cubefile[0].header)
         integrated = cubes.integ(cubefile,vrange,zunits='wcs')[0]
+        if integrated.shape != cubefile[0].data.shape[1:]:
+            raise ValueError("Cube integrated to incorrect size.  Major error.  Badness.")
         flatimg = pyfits.PrimaryHDU(data=integrated,header=flathead)
         flatimg.writeto(cubename.replace("cube","integrated")+".fits",clobber=True)
         noise = cubes.integ(cubefile,noisevrange,average=np.std,zunits='wcs')[0]
