@@ -372,14 +372,14 @@ def calibrate_cube_data(filename, outfilename, scanrange=[], refscan1=0,
 
     try:
         print "Reading file using pyfits...",
-        filepyfits = pyfits.open(fitsfile,memmap=True)
+        filepyfits = pyfits.open(filename,memmap=True)
         datapyfits = filepyfits[extension].data
     except (TypeError,ValueError):
         print "That failed, so trying to treat it as a file...",
         try:
-            datapyfits = fitsfile[extension].data
+            datapyfits = filename[extension].data
         except AttributeError:
-            datapyfits = fitsfile
+            datapyfits = filename
     if dataarr is None:
         dataarr = datapyfits['DATA']
     print "Data successfully read"
@@ -625,8 +625,10 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
         negative_mean_cut=None,
         add_with_kernel=False,
         kernel_fwhm=None,
-        fsw=False, diagnostic_plot_name=None,
-        chmod=False):
+        fsw=False,
+        diagnostic_plot_name=None,
+        chmod=False,
+        continuum_prefix=None):
     """ 
     Given a .fits file that contains a binary table of spectra (e.g., as
     you would get from the GBT mapping "pipeline" or the reduce_map.pro aoidl
@@ -650,6 +652,9 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
     elif type(nhits) is not np.ndarray:
         raise Exception( "nhits must be a .fits file or an ndarray, but it is ",type(nhits) )
     naxis2,naxis1 = nhits.shape
+
+    contimage = np.zeros_like(nhits)
+    nhits_once = np.zeros_like(nhits)
 
     # rescale image to weight by number of observations
     image = pyfits.getdata(cubefilename)*nhits
@@ -776,7 +781,8 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
                     kernel_size = kd = 5
                     kernel_middle = mid = (kd-1)/2.
                     xinds,yinds = (np.mgrid[:kd,:kd]-mid+np.array([np.round(x),np.round(y)])[:,None,None]).astype('int')
-                    kernel2d = np.exp(-((xinds-x)**2+(yinds-y))**2/(2*(kernel_fwhm/2.35/cd)**2))
+                    fwhm = np.sqrt(8*np.log(2))
+                    kernel2d = np.exp(-((xinds-x)**2+(yinds-y))**2/(2*(kernel_fwhm/fwhm/cd)**2))
 
                     dim1 = datavect.shape[0]
                     vect_to_add = np.outer(datavect[ind1:ind2],kernel2d).reshape([dim1,kd,kd])
@@ -785,10 +791,14 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
                     image[ind1:ind2,yinds,xinds] += vect_to_add
                     # NaN spectral bins are not appropriately downweighted... but they shouldn't exist anyway...
                     nhits[yinds,xinds] += kernel2d
+                    contimage[yinds,xinds] += kernel2d * contestimate
+                    nhits_once[yinds,xinds] += kernel2d
 
                 else:
                     image[ind1:ind2,int(np.round(y)),int(np.round(x))][OK]  += datavect[ind1:ind2][OK]
                     nhits[int(np.round(y)),int(np.round(x))]     += 1
+                    contimage[yinds,xinds] += contestimate
+                    nhits_once[yinds,xinds] += 1
 
                 if debug > 2:
                     print "Z-axis indices are ",ind1,ind2,"...",
@@ -880,6 +890,13 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
     HDU2.writeto(outpre+"_continuum.fits",clobber=True,output_verify='fix')
     HDU2.data = nhits
     HDU2.writeto(outpre+"_nhits.fits",clobber=True,output_verify='fix')
+
+    if continuum_prefix is not None:
+        # Solo continuum image (just this obs set)
+        HDU2.data = contimage / nhits_once
+        HDU2.writeto(continuum_prefix+"_continuum.fits",clobber=True,output_verify='fix')
+        HDU2.data = nhits_once
+        HDU2.writeto(continuum_prefix+"_nhits.fits",clobber=True,output_verify='fix')
 
     scriptfile = open(outpre+"_starlink.sh",'w')
     outpath,outfn = os.path.split(cubefilename)
