@@ -448,16 +448,15 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
         #import pdb; pdb.set_trace()
         #raise Exception
 
-    # this block redifining "include" is used for both diagnostics (optional)
-    # and continuum below
-    ind1a = np.argmin(np.abs(np.floor(v1-velo)))
-    ind2a = np.argmin(np.abs(np.ceil(v4-velo)))+1
-    dname = 'DATA' if 'DATA' in data.dtype.names else 'SPECTRA'
-    OK = (data[dname][0,:]==data[dname][0,:])
-    OK[:ind1a] = False
-    OK[ind2a:] = False
-
     if excludefitrange is not None:
+        # this block redifining "include" is used for diagnostics (optional)
+        ind1a = np.argmin(np.abs(np.floor(v1-velo)))
+        ind2a = np.argmin(np.abs(np.ceil(v4-velo)))+1
+        dname = 'DATA' if 'DATA' in data.dtype.names else 'SPECTRA'
+        OK = (data[dname][0,:]==data[dname][0,:])
+        OK[:ind1a] = False
+        OK[ind2a:] = False
+
         include = OK
 
         # Convert velocities to indices
@@ -470,6 +469,8 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
 
         if include.sum() == 0:
             raise ValueError("All data excluded.")
+    else:
+        include = slice(None)
 
 
     if diagnostic_plot_name:
@@ -524,6 +525,24 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
     HDU.writeto(cubefilename,clobber=True,output_verify='fix')
 
     outpre = cubefilename.replace(".fits","")
+
+    include = np.ones(imav.shape[0],dtype='bool')
+
+    if excludefitrange is not None:
+        # this block redifining "include" is used for continuum
+        ind1a = np.argmin(np.abs(np.floor(v1-cubevelo)))
+        ind2a = np.argmin(np.abs(np.ceil(v4-cubevelo)))+1
+
+        # Convert velocities to indices
+        exclude_inds = [np.argmin(np.abs(np.floor(v-cubevelo))) for v in excludefitrange]
+
+        # Loop through exclude_inds pairwise
+        for (i1,i2) in zip(exclude_inds[:-1:2],exclude_inds[1::2]):
+            # Do not include the excluded regions
+            include[i1:i2] = False
+
+        if include.sum() == 0:
+            raise ValueError("All data excluded.")
 
     #OKCube = (imav==imav)
     #contmap = np.nansum(imav[naxis3*0.1:naxis3*0.9,:,:],axis=0) / OKCube.sum(axis=0)
