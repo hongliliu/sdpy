@@ -122,6 +122,7 @@ def calibrate_cube_data(filename, outfilename, scanrange=[], refscan1=0,
             elif np.isnan(specrefon).sum() > 0 or np.isnan(specrefoff).sum() > 0:
                 raise ValueError("Reference scan %i contains a NAN" % refscan)
 
+    # is this redundant with the above section?
     elif refscan1 is not None and refscan2 is not None:
         OKref1 = OK * (refscan1 == data['SCAN'])  
         OKref2 = OK * (refscan2 == data['SCAN'])  
@@ -189,7 +190,11 @@ def calibrate_cube_data(filename, outfilename, scanrange=[], refscan1=0,
         LSTspec = data['LST'][specindOn]
 
         if refscans is not None:
+            # find the reference scan closest to the current scan
+            # (LSTspec is a number, LSTrefs is an array, probably length 2)
             refscannumber = np.argmin(np.abs(LSTspec-LSTrefs))
+            # if the closest reference scan is the last or it is after the spectrum...
+            # the earlier reference scan has index self-1
             if refscannumber == len(refscans) - 1 or LSTrefs[refscannumber] > LSTspec:
                 r1 = refscannumber - 1
                 r2 = refscannumber 
@@ -202,11 +207,14 @@ def calibrate_cube_data(filename, outfilename, scanrange=[], refscan1=0,
             specref2 = refarray[r2,:]
             LSTspread = LSTref2-LSTref1
 
-        specRef = (specref2-specref1)/LSTspread*(LSTspec-LSTref1) + specref1 # LINEAR interpolation between refs
+        # LINEAR interpolation between the reference scans
+        specRef = (specref2-specref1)/LSTspread*(LSTspec-LSTref1) + specref1
 
         # use a templated OFF spectrum
         # (e.g., one that has had spectral lines interpolated over)
-        if off_template is not None and off_template.shape == specRef.shape:
+        if off_template is not None:
+            if off_template.shape != specRef.shape:
+                raise ValueError("Off template shape does not match spectral shape")
             #import pdb; pdb.set_trace()
             specRef = off_template * specRef.mean() / off_template.mean()
 
