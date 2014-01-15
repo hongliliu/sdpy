@@ -546,11 +546,9 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
 
     #OKCube = (imav==imav)
     #contmap = np.nansum(imav[naxis3*0.1:naxis3*0.9,:,:],axis=0) / OKCube.sum(axis=0)
-    contmap = np.nansum(imav[include,:,:]) / include.sum()
+    contmap = np.nansum(imav[include,:,:],axis=0) / include.sum()
     HDU2 = pyfits.PrimaryHDU(data=contmap,header=flathead)
     HDU2.writeto(outpre+"_continuum.fits",clobber=True,output_verify='fix')
-    # temporary check: make sure file is readable
-    pyfits.open(outpre+"_continuum.fits")
     HDU2.data = nhits
     HDU2.writeto(outpre+"_nhits.fits",clobber=True,output_verify='fix')
 
