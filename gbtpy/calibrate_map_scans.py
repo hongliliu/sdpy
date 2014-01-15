@@ -4,21 +4,25 @@ import numpy as np
 from .timer import print_timing
 
 
-def load_data_file(filename, extension=1, dataarr=None, datapfits=None):
+def load_data_file(filename, extension=1, dataarr=None, filepyfits=None,
+                   datapfits=None):
     """
     Load the series of spectra from a raw SDFITS file
     """
 
-    try:
-        print "Reading file using pyfits...",
-        filepyfits = pyfits.open(filename,memmap=True)
-        datapyfits = filepyfits[extension].data
-    except (TypeError,ValueError):
-        print "That failed, so trying to treat it as a file...",
-        try:
-            datapyfits = filename[extension].data
-        except AttributeError:
-            datapyfits = filename
+    if filepyfits is not None:
+        datapyfits = filepyfits[extension].data 
+    else:
+        try:                                        
+            print "Reading file using pyfits...",
+            filepyfits = pyfits.open(filename,memmap=True)
+            datapyfits = filepyfits[extension].data
+        except (TypeError,ValueError):
+            print "That failed, so trying to treat it as a file...",
+            try:
+                datapyfits = filename[extension].data
+            except AttributeError:
+                datapyfits = filename
     if dataarr is None:
         dataarr = datapyfits['DATA']
     print "Data successfully read"
@@ -43,8 +47,9 @@ def load_data_file(filename, extension=1, dataarr=None, datapfits=None):
 def calibrate_cube_data(filename, outfilename, scanrange=[], refscan1=0,
         refscan2=0, sourcename=None, feednum=1, sampler=0, return_data=False,
         datapfits=None, dataarr=None, clobber=True, tau=0.0,
-        obsmode=None, refscans=None, off_template=None, flag_neg_tsys=True,
-        replace_neg_tsys=False, extension=1):
+        obsmode=None, refscans=None, off_template=None,
+        filepyfits=None,
+        extension=1):
     """
 
     Parameters
@@ -74,7 +79,11 @@ def calibrate_cube_data(filename, outfilename, scanrange=[], refscan1=0,
         (normalized!)
     """
 
-    data, dataarr, namelist, filepyfits = load_data_file(filename, extension=extension, dataarr=dataarr, datapfits=datapfits)
+    data, dataarr, namelist, filepyfits = load_data_file(filename,
+                                                         extension=extension,
+                                                         dataarr=dataarr,
+                                                         datapfits=datapfits,
+                                                         filepyfits=filepyfits)
 
     newdatadict = dict([(n,[]) for n in namelist])
     formatdict = dict([(t.name,t.format) for t in filepyfits[extension].columns])
