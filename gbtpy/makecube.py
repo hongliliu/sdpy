@@ -810,31 +810,34 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
         #import pdb; pdb.set_trace()
         #raise Exception
 
+    # this block redifining "include" is used for both diagnostics (optional)
+    # and continuum below
+    ind1a = np.argmin(np.abs(np.floor(v1-velo)))
+    ind2a = np.argmin(np.abs(np.ceil(v4-velo)))+1
+    dname = 'DATA' if 'DATA' in data.dtype.names else 'SPECTRA'
+    OK = (data[dname][0,:]==data[dname][0,:])
+    OK[:ind1a] = False
+    OK[ind2a:] = False
+
+    if excludefitrange is not None:
+        include = OK
+
+        # Convert velocities to indices
+        exclude_inds = [np.argmin(np.abs(np.floor(v-velo))) for v in excludefitrange]
+
+        # Loop through exclude_inds pairwise
+        for (i1,i2) in zip(exclude_inds[:-1:2],exclude_inds[1::2]):
+            # Do not include the excluded regions
+            include[i1:i2] = False
+
+        if include.sum() == 0:
+            raise ValueError("All data excluded.")
+
+
     if diagnostic_plot_name:
         from mpl_plot_templates import imdiagnostics
 
-        dname = 'DATA' if 'DATA' in data.dtype.names else 'SPECTRA'
-
         pylab.clf()
-        ind1a = np.argmin(np.abs(np.floor(v1-velo)))
-        ind2a = np.argmin(np.abs(np.ceil(v4-velo)))+1
-        OK = (data[dname][0,:]==data[dname][0,:])
-        OK[:ind1a] = False
-        OK[ind2a:] = False
-
-        if excludefitrange is not None:
-            include = OK
-
-            # Convert velocities to indices
-            exclude_inds = [np.argmin(np.abs(np.floor(v-velo))) for v in excludefitrange]
-
-            # Loop through exclude_inds pairwise
-            for (i1,i2) in zip(exclude_inds[:-1:2],exclude_inds[1::2]):
-                # Do not include the excluded regions
-                include[i1:i2] = False
-
-            if include.sum() == 0:
-                raise ValueError("All data excluded.")
 
         dd = data[dname][:,include]
         imdiagnostics(dd,axis=pylab.gca())
@@ -884,8 +887,9 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
 
     outpre = cubefilename.replace(".fits","")
 
-    OKCube = (imav==imav)
-    contmap = np.nansum(imav[naxis3*0.1:naxis3*0.9,:,:],axis=0) / OKCube.sum(axis=0)
+    #OKCube = (imav==imav)
+    #contmap = np.nansum(imav[naxis3*0.1:naxis3*0.9,:,:],axis=0) / OKCube.sum(axis=0)
+    contmap = np.nansum(imav[include,:,:]) / include.sum()
     HDU2 = pyfits.PrimaryHDU(data=contmap,header=flathead)
     HDU2.writeto(outpre+"_continuum.fits",clobber=True,output_verify='fix')
     HDU2.data = nhits
