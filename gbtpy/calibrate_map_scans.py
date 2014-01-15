@@ -1,6 +1,9 @@
 import astropy.io.fits as pyfits
 import numpy as np
 
+from .timer import print_timing
+
+
 def load_data_file(filename, extension=1, dataarr=None, filepyfits=None,
                    datapfits=None):
     """
@@ -40,6 +43,7 @@ def load_data_file(filename, extension=1, dataarr=None, filepyfits=None,
 
     return data, dataarr, namelist, filepyfits
 
+@print_timing
 def calibrate_cube_data(filename, outfilename, scanrange=[], refscan1=0,
         refscan2=0, sourcename=None, feednum=1, sampler=0, return_data=False,
         datapfits=None, dataarr=None, clobber=True, tau=0.0,
