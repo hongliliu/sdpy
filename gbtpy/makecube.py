@@ -416,10 +416,12 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
                 print "did not skip...",
             if 0 < int(np.round(x)) < naxis1 and 0 < int(np.round(y)) < naxis2:
                 if add_with_kernel:
-                    kernel_size = kd = 5
+                    fwhm = np.sqrt(8*np.log(2))
+                    kernel_size = kd = int(np.ceil(kernel_fwhm/fwhm/cd * 5))
+                    if kernel_size < 5:
+                        kernel_size = kd = 5
                     kernel_middle = mid = (kd-1)/2.
                     xinds,yinds = (np.mgrid[:kd,:kd]-mid+np.array([np.round(x),np.round(y)])[:,None,None]).astype('int')
-                    fwhm = np.sqrt(8*np.log(2))
                     kernel2d = np.exp(-((xinds-x)**2+(yinds-y))**2/(2*(kernel_fwhm/fwhm/cd)**2))
 
                     dim1 = datavect.shape[0]
@@ -435,8 +437,8 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
                 else:
                     image[ind1:ind2,int(np.round(y)),int(np.round(x))][OK]  += datavect[ind1:ind2][OK]
                     nhits[int(np.round(y)),int(np.round(x))]     += 1
-                    contimage[yinds,xinds] += contestimate
-                    nhits_once[yinds,xinds] += 1
+                    contimage[int(np.round(y)),int(np.round(x))] += contestimate
+                    nhits_once[int(np.round(y)),int(np.round(x))] += 1
 
                 if debug > 2:
                     print "Z-axis indices are ",ind1,ind2,"...",
