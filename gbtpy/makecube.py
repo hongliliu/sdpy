@@ -420,6 +420,8 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
                     kernel_size = kd = int(np.ceil(kernel_fwhm/fwhm/cd * 5))
                     if kernel_size < 5:
                         kernel_size = kd = 5
+                    if kernel_size % 2 == 0:
+                        kernel_size = kd = kernel_size+1
                     kernel_middle = mid = (kd-1)/2.
                     xinds,yinds = (np.mgrid[:kd,:kd]-mid+np.array([np.round(x),np.round(y)])[:,None,None]).astype('int')
                     kernel2d = np.exp(-((xinds-x)**2+(yinds-y))**2/(2*(kernel_fwhm/fwhm/cd)**2))
