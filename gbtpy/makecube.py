@@ -563,7 +563,8 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
     outpath,outfn = os.path.split(cubefilename)
     outpath,pre = os.path.split(outpre)
     print >>scriptfile,("#!/bin/bash")
-    print >>scriptfile,('cd %s' % outpath)
+    if outpath != '':
+        print >>scriptfile,('cd %s' % outpath)
     print >>scriptfile,('. /star/etc/profile')
     print >>scriptfile,('kappa > /dev/null')
     print >>scriptfile,('convert > /dev/null')
