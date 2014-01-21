@@ -641,8 +641,9 @@ try:
         flatimg.data = mincube
         flatimg.writeto(cubename.replace("cube","min")+".fits",clobber=True)
 
-    def make_taucube(cubename,continuum=0.0,continuum_units='K',TCMB=2.7315, etamb=1.):
-        cubefile = pyfits.open(cubename+"_sub.fits")
+    def make_taucube(cubename,continuum=0.0,continuum_units='K',TCMB=2.7315,
+                     etamb=1., suffix="_sub.fits"):
+        cubefile = pyfits.open(cubename+suffix)
         cubefile[0].header = _fix_ms_kms_header(cubefile[0].header)
         if type(continuum) is str:
             continuum = pyfits.getdata(continuum)
