@@ -642,7 +642,7 @@ try:
         flatimg.writeto(cubename.replace("cube","min")+".fits",clobber=True)
 
     def make_taucube(cubename,continuum=0.0,continuum_units='K',TCMB=2.7315,
-                     etamb=1., suffix="_sub.fits"):
+                     etamb=1., suffix="_sub.fits", outsuffix='.fits'):
         cubefile = pyfits.open(cubename+suffix)
         cubefile[0].header = _fix_ms_kms_header(cubefile[0].header)
         if type(continuum) is str:
@@ -652,10 +652,10 @@ try:
         tau = -np.log( (TCMB+cubefile[0].data/etamb+continuum/etamb) / (TCMB+continuum/etamb) )
         cubefile[0].data = tau
         cubefile[0].header['BUNIT']='tau'
-        cubefile.writeto(cubename.replace("cube","taucube")+".fits",clobber=True)
+        cubefile.writeto(cubename.replace("cube","taucube")+outsuffix,clobber=True)
         cubefile[0].data = tau.sum(axis=0)
         cubefile[0].header['BUNIT']='tau km/s'
-        cubefile.writeto(cubename.replace("cube","taucube_integrated")+".fits",clobber=True)
+        cubefile.writeto(cubename.replace("cube","taucube_integrated")+outsuffix,clobber=True)
 
 except:
     pass
