@@ -189,7 +189,7 @@ def selectsource(data, sampler, sourcename=None, obsmode=None, scanrange=[],
     if sourcename is not None:
         OKsource *= (data['OBJECT'] == sourcename)
     if scanrange is not []:
-        OKsource *= (scanrange[0] < data['SCAN'])*(data['SCAN'] < scanrange[1])
+        OKsource *= (scanrange[0] <= data['SCAN'])*(data['SCAN'] <= scanrange[1])
     if obsmode is not None:
         OKsource *= ((obsmode == data.OBSMODE) + ((obsmode+":NONE:TPWCAL") == data.OBSMODE))
     if sourcename is None and scanrange is None:
