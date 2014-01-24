@@ -109,22 +109,27 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
     # (it will be normalized, so this just increases the S/N)
     off_template = np.mean([medon,medoff],axis=0)
 
-    # interpolate across the excluded regions
-    velo = velo_iterator(data,linefreq=linefreq).next()
-    OKvelo = (velo > interp_vrange[0]) * (velo < interp_vrange[1]) 
-    nOKvelo = np.zeros(velo.size,dtype='bool')
-    for low,high in zip(*[iter(exclude_velo)]*2):
-        OKvelo[(velo > low) * (velo < high)] = False
-        nOKvelo[(velo > low) * (velo < high)] = True
-
-    polypars = np.polyfit(np.arange(velo.size)[OKvelo],
-                          off_template[OKvelo],
-                          interp_polyorder)
-
     if return_uninterp:
         off_template_in = np.copy(off_template)
-    # replace the "not OK" regions with the interpolated values
-    off_template[nOKvelo] = np.polyval(polypars, np.arange(velo.size)[nOKvelo]).astype(off_template.dtype)
+
+    if interp_vrange and exclude_velo:
+        # interpolate across the excluded regions
+        velo = velo_iterator(data,linefreq=linefreq).next()
+        OKvelo = (velo > interp_vrange[0]) * (velo < interp_vrange[1]) 
+        nOKvelo = np.zeros(velo.size,dtype='bool')
+        for low,high in zip(*[iter(exclude_velo)]*2):
+            OKvelo[(velo > low) * (velo < high)] = False
+            nOKvelo[(velo > low) * (velo < high)] = True
+
+        if OKvelo.sum() > interp_polyorder:
+            polypars = np.polyfit(np.arange(velo.size)[OKvelo],
+                                  off_template[OKvelo],
+                                  interp_polyorder)
+        else:
+            raise ValueError("Polynomial order to be fitted is greater than the number of points to be fitted.")
+
+        # replace the "not OK" regions with the interpolated values
+        off_template[nOKvelo] = np.polyval(polypars, np.arange(velo.size)[nOKvelo]).astype(off_template.dtype)
 
     if np.any(np.isnan(off_template)):
         raise ValueError("Invalid off: contains nans.")
