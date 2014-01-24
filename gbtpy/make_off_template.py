@@ -3,6 +3,7 @@ from .makecube import selectsource,velo_iterator
 import numpy as np
 
 def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
+             exclude_spectral_ends=False,
              dataarr=None, obsmode=None, exclude_velo=(), interp_polyorder=5,
              extension=1,
              percentile=50, interp_vrange=(), linefreq=None, return_uninterp=False):
@@ -24,6 +25,9 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
         *DATA SELECTION PARAMETER* Sampler to create the off for (e.g., 'A9')
     obsmode : str
         *DATA SELECTION PARAMETER* Observation Mode to include (e.g., DecLatMap)
+    exclude_spectral_ends: bool or float
+        If a float, indicates the percent of the start & end of the spectra to
+        exclude when computing the mean (i.e., the continuum level)
     dataarr : None or np.ndarray
         OPTIONAL input of data array.  If it has already been read, this param saves time
     exclude_velo : 2n-tuple
@@ -85,12 +89,27 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
 
     speclen = dataarr.shape[1]
 
-    scan_means_on = dataarr[OKsource*CalOn].mean(axis=1)
-    scan_means_off = dataarr[OKsource*CalOff].mean(axis=1)
+    # compute mean of each spectrum (this is a continuum time-series)
+    # Start by optionally excluding the ends of the spectrum, where signal is usually forced to zero
+    if exclude_spectral_ends:
+        endsslice = slice(speclen*exclude_spectral_ends/100.,
+                          -speclen*exclude_spectral_ends/100.)
+    else:
+        endsslice = slice(None)
+
+    scan_means_on = dataarr[OKsource*CalOn][:,endsslice].mean(axis=1)
+    scan_means_off = dataarr[OKsource*CalOff][:,endsslice].mean(axis=1)
+
+    # Divide by the continuum before taking the median across time
+    # (note the transpose .T, which is why axis=1 works here too)
+    # Without normalizing by the continuum, the median is meaningless
     medon = np.percentile(dataarr[OKsource*CalOn].T / scan_means_on, percentile, axis=1)
     medoff = np.percentile(dataarr[OKsource*CalOff].T / scan_means_off, percentile, axis=1)
+    # the off template is then the mean of the caloff + calon scans
+    # (it will be normalized, so this just increases the S/N)
     off_template = np.mean([medon,medoff],axis=0)
 
+    # interpolate across the excluded regions
     velo = velo_iterator(data,linefreq=linefreq).next()
     OKvelo = (velo > interp_vrange[0]) * (velo < interp_vrange[1]) 
     nOKvelo = np.zeros(velo.size,dtype='bool')
@@ -98,8 +117,9 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
         OKvelo[(velo > low) * (velo < high)] = False
         nOKvelo[(velo > low) * (velo < high)] = True
 
-    polypars = np.polyfit( np.arange(velo.size)[OKvelo], off_template[OKvelo],
-            interp_polyorder)
+    polypars = np.polyfit(np.arange(velo.size)[OKvelo],
+                          off_template[OKvelo],
+                          interp_polyorder)
 
     if return_uninterp:
         off_template_in = np.copy(off_template)

@@ -13,15 +13,16 @@ def load_data_file(filename, extension=1, dataarr=None, filepyfits=None,
     if filepyfits is not None:
         datapyfits = filepyfits[extension].data 
     else:
-        try:                                        
-            print "Reading file using pyfits...",
-            filepyfits = pyfits.open(filename,memmap=True)
-            datapyfits = filepyfits[extension].data
-        except (TypeError,ValueError):
-            print "That failed, so trying to treat it as a file...",
-            try:
-                datapyfits = filename[extension].data
-            except AttributeError:
+        try:
+            print "Treating file as an open FITS HDU",
+            datapyfits = filename[extension].data
+        except AttributeError:
+            print "File is not an HDU.  Reading file from disk using pyfits...",
+            if isinstance(filename,str):
+                filepyfits = pyfits.open(filename,memmap=True)
+                datapyfits = filepyfits[extension].data
+            else:
+                print "Assuming file is a FITS BinaryTableHDU"
                 datapyfits = filename
     if dataarr is None:
         dataarr = datapyfits['DATA']
