@@ -27,7 +27,8 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
         *DATA SELECTION PARAMETER* Observation Mode to include (e.g., DecLatMap)
     exclude_spectral_ends: bool or float
         If a float, indicates the percent of the start & end of the spectra to
-        exclude when computing the mean (i.e., the continuum level)
+        exclude when computing the mean (i.e., the continuum level).  Note that
+        this is a PERCENT, so it should be in the range [0,100]
     dataarr : None or np.ndarray
         OPTIONAL input of data array.  If it has already been read, this param saves time
     exclude_velo : 2n-tuple
