@@ -641,21 +641,36 @@ try:
         flatimg.data = mincube
         flatimg.writeto(cubename.replace("cube","min")+".fits",clobber=True)
 
-    def make_taucube(cubename,continuum=0.0,continuum_units='K',TCMB=2.7315,
-                     etamb=1., suffix="_sub.fits", outsuffix='.fits'):
-        cubefile = pyfits.open(cubename+suffix)
-        cubefile[0].header = _fix_ms_kms_header(cubefile[0].header)
-        if type(continuum) is str:
-            continuum = pyfits.getdata(continuum)
-        if cubefile[0].header.get('BUNIT') != continuum_units:
-            raise ValueError("Unit mismatch.")
-        tau = -np.log( (TCMB+cubefile[0].data/etamb+continuum/etamb) / (TCMB+continuum/etamb) )
-        cubefile[0].data = tau
-        cubefile[0].header['BUNIT']='tau'
-        cubefile.writeto(cubename.replace("cube","taucube")+outsuffix,clobber=True)
-        cubefile[0].data = tau.sum(axis=0)
-        cubefile[0].header['BUNIT']='tau km/s'
-        cubefile.writeto(cubename.replace("cube","taucube_integrated")+outsuffix,clobber=True)
 
 except:
     pass
+
+def make_taucube(cubename,continuum=0.0,continuum_units='K',TCMB=2.7315,
+                 etamb=1., suffix="_sub.fits", outsuffix='.fits',
+                 linefreq=None, tex=None):
+    cubefile = pyfits.open(cubename+suffix)
+    cubefile[0].header = _fix_ms_kms_header(cubefile[0].header)
+    if type(continuum) is str:
+        continuum = pyfits.getdata(continuum)
+    if cubefile[0].header.get('BUNIT') != continuum_units:
+        raise ValueError("Unit mismatch.")
+    if linefreq is not None and tex is not None:
+        from astropy import units as u
+        from astropy import constants
+        if not hasattr(linefreq,'unit'):
+            linefreq = linefreq * u.GHz
+        if not hasattr(tex,'unit'):
+            tex = tex * u.K
+        T0 = (constants.h * linefreq / constants.k_B).to(u.K)
+        # TB is the "beam temperature" background-subtracted (from Rohlfs & Wilson)
+        TB = (cubefile[0].data/etamb + continuum/etamb)*u.K
+        tau = -np.log(1-(TB/T0)*( (np.exp(T0/tex)-1)**-1  - (np.exp(T0/TCMB)-1)**-1 )**-1)
+    else:
+        # Works in low-tau regime
+        tau = -np.log( (TCMB+cubefile[0].data/etamb+continuum/etamb) / (TCMB+continuum/etamb) )
+    cubefile[0].data = tau
+    cubefile[0].header['BUNIT']='tau'
+    cubefile.writeto(cubename.replace("cube","taucube")+outsuffix,clobber=True)
+    cubefile[0].data = tau.sum(axis=0)
+    cubefile[0].header['BUNIT']='tau km/s'
+    cubefile.writeto(cubename.replace("cube","taucube_integrated")+outsuffix,clobber=True)

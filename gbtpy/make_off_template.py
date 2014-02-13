@@ -2,11 +2,66 @@ from .calibrate_map_scans import load_data_file
 from .makecube import selectsource,velo_iterator
 import numpy as np
 
+from astropy.io import fits
+from astropy import units as u
+
+type_to_ctype = {'length':'WAVE',
+                 'frequency':'FREQ',
+                 'speed':'VELO',
+                }
+
+def generate_1d_header_fromdisparray(arr, cdelt_tolerance=1e-8, reference=None,
+                                     unit=None):
+    """
+    Parameters
+    ----------
+    cdelt_tolerance : float
+        Tolerance in the difference between pixels that determines
+        how near to linear the dispersion axis must be
+    """
+    header = fits.Header()
+
+    # convert array to numpy array with no units
+    if hasattr(arr,'unit'):
+        if unit is None:
+            unit = arr.unit
+        arr = arr.value
+
+    # convert string to unit
+    if not hasattr(unit,'name'):
+        unit = u.Unit(unit)
+    
+    # determine CDELT
+    dxarr = np.diff(arr)
+    if abs(dxarr.max()-dxarr.min())/abs(dxarr.min()) < tolerance:
+        cdelt = dxarr.mean().flat[0]
+    else:
+        raise ValueError("Dispersion array is not linear.")
+
+    # determine CRVAL, CRPIX
+    crval = arr.min()
+    crpix = 1
+
+    if reference is not None:
+        restfrq = reference.to(u.Hz, u.spectral())
+        header['RESTFRQ'] = restfrq
+
+    header['CRVAL1'] = crval
+    header['CDELT1'] = cdelt
+    header['CRPIX1'] = crpix
+    header['CUNIT1'] = unit.name
+    header['CTYPE1'] = type_to_ctype(unit.physical_type)
+
+    return header
+
 def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
              exclude_spectral_ends=False,
+             savefile=None,
              dataarr=None, obsmode=None, exclude_velo=(), interp_polyorder=5,
+             return_poly=False,
              extension=1,
-             percentile=50, interp_vrange=(), linefreq=None, return_uninterp=False):
+             percentile=50, interp_vrange=(), linefreq=None, return_uninterp=False,
+             clobber=False):
     """
     Create an 'off' spectrum from a large collection of data by taking
     the median across time (or fitting across time?) and interpolating across certain
@@ -44,6 +99,12 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
         The percentile of the data to use for the reference.  Normally, you
         would use 50 to get the median of the data, but if there is emission at
         all positions, you might choose, e.g., 25, or absorption, 75.
+    savefile : None or str
+        Optional save file name *prefix* to which the string
+        "_offspectra.fits" will be appended.  This file will contain
+        two spectra, one with interpolation and one without
+    clobber : bool
+        Overwrite savefile?
 
     Returns
     -------
@@ -113,10 +174,11 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
     if return_uninterp:
         off_template_in = np.copy(off_template)
 
-    if interp_vrange and exclude_velo:
+    if interp_vrange:
         # interpolate across the excluded regions
         velo = velo_iterator(data,linefreq=linefreq).next()
         OKvelo = (velo > interp_vrange[0]) * (velo < interp_vrange[1]) 
+    if exclude_velo:
         nOKvelo = np.zeros(velo.size,dtype='bool')
         for low,high in zip(*[iter(exclude_velo)]*2):
             OKvelo[(velo > low) * (velo < high)] = False
@@ -131,11 +193,32 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
 
         # replace the "not OK" regions with the interpolated values
         off_template[nOKvelo] = np.polyval(polypars, np.arange(velo.size)[nOKvelo]).astype(off_template.dtype)
+    elif return_poly and interp_vrange:
+        polypars = np.polyfit(np.arange(velo.size)[OKvelo],
+                              off_template[OKvelo],
+                              interp_polyorder)
+    elif return_poly:
+        polypars = np.polyfit(np.arange(velo.size),
+                              off_template,
+                              interp_polyorder)
 
     if np.any(np.isnan(off_template)):
         raise ValueError("Invalid off: contains nans.")
 
+    if savefile:
+        header = generate_1d_header_fromdisparray(velo*u.km/u.s,)
+        outf = fits.PrimaryHDU(data=[off_template,off_template_in],
+                               header=header)
+        outf.writeto(savefile+"_offspectra.fits", clobber=clobber)
+
+
+    return_vals = off_template,
     if return_uninterp:
-        return off_template,off_template_in
+        return_vals = return_vals + (off_template_in,)
+    if return_poly:
+        return_vals = return_vals + (np.polyval(polypars, np.arange(velo.size)).astype(off_template.dtype),)
+
+    if len(return_vals) == 1:
+        return return_vals[0]
     else:
-        return off_template
+        return return_vals
