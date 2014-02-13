@@ -61,7 +61,8 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
              return_poly=False,
              extension=1,
              percentile=50, interp_vrange=(), linefreq=None, return_uninterp=False,
-             clobber=False):
+             clobber=False,
+             debug=False):
     """
     Create an 'off' spectrum from a large collection of data by taking
     the median across time (or fitting across time?) and interpolating across certain
@@ -177,6 +178,7 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
     if interp_vrange:
         # interpolate across the excluded regions
         velo = velo_iterator(data,linefreq=linefreq).next()
+        if debug: print 'min,max velo',velo.min(),velo.max()
         OKvelo = (velo > interp_vrange[0]) * (velo < interp_vrange[1]) 
     if exclude_velo:
         nOKvelo = np.zeros(velo.size,dtype='bool')
@@ -216,6 +218,7 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
     if savefile:
         if not 'velo' in locals():
             velo = velo_iterator(data,linefreq=linefreq).next()
+        if debug: print 'min,max velo',velo.min(),velo.max()
         header = generate_1d_header_fromdisparray(velo*u.km/u.s,
                                                   reference=linefreq*u.Hz if linefreq is not None else None)
         outf = fits.PrimaryHDU(data=np.array(return_vals),
