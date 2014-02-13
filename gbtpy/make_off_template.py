@@ -205,21 +205,23 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
     if np.any(np.isnan(off_template)):
         raise ValueError("Invalid off: contains nans.")
 
-    if savefile:
-        if not velo in locals():
-            velo = velo_iterator(data,linefreq=linefreq).next()
-        header = generate_1d_header_fromdisparray(velo*u.km/u.s,
-                                                  reference=linefreq*u.Hz)
-        outf = fits.PrimaryHDU(data=[off_template,off_template_in],
-                               header=header)
-        outf.writeto(savefile+"_offspectra.fits", clobber=clobber)
-
 
     return_vals = off_template,
     if return_uninterp:
         return_vals = return_vals + (off_template_in,)
     if return_poly:
         return_vals = return_vals + (np.polyval(polypars, np.arange(velo.size)).astype(off_template.dtype),)
+
+
+    if savefile:
+        if not 'velo' in locals():
+            velo = velo_iterator(data,linefreq=linefreq).next()
+        header = generate_1d_header_fromdisparray(velo*u.km/u.s,
+                                                  reference=linefreq*u.Hz)
+        outf = fits.PrimaryHDU(data=np.array(return_vals),
+                               header=header)
+        outf.writeto(savefile+"_offspectra.fits", clobber=clobber)
+
 
     if len(return_vals) == 1:
         return return_vals[0]
