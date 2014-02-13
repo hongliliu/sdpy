@@ -33,7 +33,7 @@ def generate_1d_header_fromdisparray(arr, cdelt_tolerance=1e-8, reference=None,
     
     # determine CDELT
     dxarr = np.diff(arr)
-    if abs(dxarr.max()-dxarr.min())/abs(dxarr.min()) < tolerance:
+    if abs(dxarr.max()-dxarr.min())/abs(dxarr.min()) < cdelt_tolerance:
         cdelt = dxarr.mean().flat[0]
     else:
         raise ValueError("Dispersion array is not linear.")
