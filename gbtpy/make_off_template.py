@@ -217,7 +217,7 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
         if not 'velo' in locals():
             velo = velo_iterator(data,linefreq=linefreq).next()
         header = generate_1d_header_fromdisparray(velo*u.km/u.s,
-                                                  reference=linefreq*u.Hz)
+                                                  reference=linefreq*u.Hz if linefreq is not None else None)
         outf = fits.PrimaryHDU(data=np.array(return_vals),
                                header=header)
         outf.writeto(savefile+"_offspectra.fits", clobber=clobber)
