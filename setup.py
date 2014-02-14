@@ -2,13 +2,13 @@
 
 from setuptools import setup
 
-setup(name='gbtpy',
+setup(name='sdpy',
       version='0.0.0.dev',
-      description='GBT python tools',
+      description='Single-dish heterodyne spectroscopy python tools',
       author='Adam Ginsburg',
       author_email='adam.g.ginsburg@gmail.com',
-      packages=['gbtpy'],
-      provides=['gbtpy'],
+      packages=['sdpy'],
+      provides=['sdpy'],
       requires=['numpy'],
       keywords=['Scientific/Engineering'],
       )

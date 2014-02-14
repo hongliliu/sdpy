@@ -147,7 +147,7 @@ def velo_iterator(data,linefreq=None):
             velo = (np.arange(npix)+1-CRPIX)*CDELT + CRVAL
         elif hasattr(data,'DATA'):
             npix = data.DATA.shape[1]
-            restfreq = data.RESTFREQ[ii]
+            #restfreq = data.RESTFREQ[ii]
             obsfreq  = data.OBSFREQ[ii]
             deltaf   = data.CDELT1[ii]
             sourcevel = data.VELOCITY[ii]
@@ -199,7 +199,7 @@ def selectsource(data, sampler, sourcename=None, obsmode=None, scanrange=[],
 
 def generate_continuum_map(filename, pixsize=24, **kwargs):
     data = pyfits.getdata(filename)
-    fileheader = pyfits.getheader(filename)
+    #fileheader = pyfits.getheader(filename)
     if hasattr(data,'CRVAL2') and hasattr(data,'CRVAL2'):
         minx,maxx = data.CRVAL2.min(),data.CRVAL2.max()
         miny,maxy = data.CRVAL3.min(),data.CRVAL3.max()
@@ -252,22 +252,19 @@ def generate_continuum_map(filename, pixsize=24, **kwargs):
     HDU2.writeto(outpre+"_nhits.fits",clobber=True)
 
 def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
-        cubeheader='cubeheader.txt', nhits=None, wcstype='',
-        smoothto=1, baselineorder=5,
-        velocityrange=None, excludefitrange=None, noisecut=np.inf,
-        do_runscript=False, linefreq=None, allow_smooth=True,
-        data_iterator=data_iterator, coord_iterator=coord_iterator,
-        velo_iterator=velo_iterator, debug=False,
-        progressbar=False, coordsys='galactic',
-        velocity_offset=0.0,
-        negative_mean_cut=None,
-        add_with_kernel=False,
-        kernel_fwhm=None,
-        fsw=False,
-        diagnostic_plot_name=None,
-        chmod=False,
-        continuum_prefix=None):
-    """ 
+                     cubeheader='cubeheader.txt', nhits=None, wcstype='',
+                     smoothto=1, baselineorder=5, velocityrange=None,
+                     excludefitrange=None, noisecut=np.inf, do_runscript=False,
+                     linefreq=None, allow_smooth=True,
+                     data_iterator=data_iterator,
+                     coord_iterator=coord_iterator,
+                     velo_iterator=velo_iterator, debug=False,
+                     progressbar=False, coordsys='galactic',
+                     velocity_offset=0.0, negative_mean_cut=None,
+                     add_with_kernel=False, kernel_fwhm=None, fsw=False,
+                     diagnostic_plot_name=None, chmod=False,
+                     continuum_prefix=None):
+    """
     Given a .fits file that contains a binary table of spectra (e.g., as
     you would get from the GBT mapping "pipeline" or the reduce_map.pro aoidl
     file provided by Adam Ginsburg), adds each spectrum into the cubefile.

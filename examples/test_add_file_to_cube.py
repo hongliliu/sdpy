@@ -1,4 +1,4 @@
-from gbtpy import makecube
+from sdpy import makecube
 import numpy as np
 
 filename = '/Users/adam/observations/gbt/W51map/Session17_111to186_D37_F2.fits'
