@@ -39,7 +39,10 @@ def generate_1d_header_fromdisparray(arr, cdelt_tolerance=1e-8, reference=None,
         raise ValueError("Dispersion array is not linear.")
 
     # determine CRVAL, CRPIX
-    crval = arr.min()
+    if cdelt > 0:
+        crval = arr.min()
+    else:
+        crval = arr.max()
     crpix = 1
 
     if reference is not None:
