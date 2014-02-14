@@ -617,9 +617,12 @@ def _fix_ms_kms_header(header):
     return header
 
 def _fix_ms_kms_file(filename):
-    f = pyfits.open(filename)
-    f[0].header = _fix_ms_kms_header(f[0].header)
-    f.writeto(filename,clobber=True)
+    if os.path.exists(filename):
+        f = pyfits.open(filename)
+        f[0].header = _fix_ms_kms_header(f[0].header)
+        f.writeto(filename,clobber=True)
+    else:
+        print "{0} does not exist".format(filename)
 
 try:
     # requires agpy.  Might not work
