@@ -139,7 +139,7 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
 
     # Fraction of ends to exclude
     exfrac = exclude_spectral_ends/100.
-    exslice = speclen*exfrac:-speclen*exfrac
+    exslice = slice(speclen*exfrac,-speclen*exfrac)
 
     # reference scans define the "background continuum"
     if type(refscans) == list:
