@@ -124,7 +124,9 @@ def calibrate_cube_data(filename, outfilename, scanrange=[], refscan1=0,
 
     # Fraction of ends to exclude
     exfrac = exclude_spectral_ends/100.
+    exslice = speclen*exfrac:-speclen*exfrac
 
+    # reference scans define the "background continuum"
     if type(refscans) == list:
         refarray = np.zeros([len(refscans),speclen])
         LSTrefs  = np.zeros([len(refscans)])
@@ -134,8 +136,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[], refscan1=0,
             specrefon  = np.median(dataarr[OKref*CalOn,:],axis=0) 
             specrefoff = np.median(dataarr[OKref*CalOff,:],axis=0)
             tcalref    = np.median(data['TCAL'][OKref])
-            tsysref    = ( np.mean(specrefoff[speclen*exfrac:-speclen*exfrac]) / 
-                    (np.mean((specrefon-specrefoff)[speclen*exfrac:-speclen*exfrac])) * 
+            tsysref    = ( np.mean(specrefoff[exslice]) / 
+                    (np.mean((specrefon-specrefoff)[exslice])) * 
                     tcalref + tcalref/2.0 )
             refarray[II] = (specrefon + specrefoff)/2.0
             LSTrefs[II]  = np.mean(data['LST'][OKref])
@@ -145,6 +147,7 @@ def calibrate_cube_data(filename, outfilename, scanrange=[], refscan1=0,
                 raise ValueError("Reference scan %i contains a NAN" % refscan)
 
     # is this redundant with the above section?
+    # Yes: this is only for "bracketing" reference scans
     elif refscan1 is not None and refscan2 is not None:
         OKref1 = OK * (refscan1 == data['SCAN'])  
         OKref2 = OK * (refscan2 == data['SCAN'])  
@@ -152,8 +155,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[], refscan1=0,
         specref1on  = np.median(dataarr[OKref1*CalOn,:],axis=0) 
         specref1off = np.median(dataarr[OKref1*CalOff,:],axis=0)
         tcalref1    = np.median(data['TCAL'][OKref1])
-        tsysref1    = ( np.mean(specref1off[speclen*exfrac:-speclen*exfrac]) / 
-                (np.mean((specref1on-specref1off)[speclen*exfrac:-speclen*exfrac])) * 
+        tsysref1    = ( np.mean(specref1off[exslice]) / 
+                (np.mean((specref1on-specref1off)[exslice])) * 
                 tcalref1 + tcalref1/2.0 )
         specref1 = (specref1on + specref1off)/2.0
         LSTref1 = np.mean(data['LST'][OKref1])
@@ -165,8 +168,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[], refscan1=0,
         specref2on  = np.median(dataarr[OKref2*CalOn,:],axis=0) 
         specref2off = np.median(dataarr[OKref2*CalOff,:],axis=0)
         tcalref2    = np.median(data['TCAL'][OKref2])
-        tsysref2    = ( np.mean(specref2off[speclen*exfrac:-speclen*exfrac]) / 
-                (np.mean((specref2on-specref2off)[speclen*exfrac:-speclen*exfrac])) * 
+        tsysref2    = ( np.mean(specref2off[exslice]) / 
+                (np.mean((specref2on-specref2off)[exslice])) * 
                 tcalref2 + tcalref2/2.0 )
         specref2 = (specref2on + specref2off)/2.0
         LSTref2 = np.mean(data['LST'][OKref2])
@@ -186,8 +189,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[], refscan1=0,
     for scanid in scannumbers:
         whscan = data['SCAN'] == scanid
 
-        on_data = dataarr[whscan*CalOn,speclen*exfrac:-speclen*exfrac]
-        off_data = dataarr[whscan*CalOff,speclen*exfrac:-speclen*exfrac]
+        on_data = dataarr[whscan*CalOn,exslice]
+        off_data = dataarr[whscan*CalOff,exslice]
         tcal = np.median(data['TCAL'][whscan])
 
         offmean = np.median(off_data,axis=0).mean()
@@ -204,7 +207,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[], refscan1=0,
             if K != 'DATA':
                 newdatadict[K].append(data[K][specindOn])
             else:
-                newdatadict['DATA'].append(np.zeros(4096))
+                # should this be speclen or 4096?  Changing to speclen...
+                newdatadict['DATA'].append(np.zeros(speclen))
 
         specOn = dataarr[specindOn,:]
         specOff = dataarr[specindOff,:]
@@ -237,8 +241,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[], refscan1=0,
         if off_template is not None:
             if off_template.shape != specRef.shape:
                 raise ValueError("Off template shape does not match spectral shape")
-            #import pdb; pdb.set_trace()
-            specRef = off_template * specRef.mean() / off_template.mean()
+            # exclude spectral ends when ratio-ing
+            specRef = off_template * specRef[exslice].mean() / off_template[exslice].mean()
 
         tsys = data['TSYS'][specindOn]
 
