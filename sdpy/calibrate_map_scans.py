@@ -88,6 +88,10 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
     exclude_spectral_ends: float
         PERCENT (range [0,100]) of the spectrum to exclude at either end when
         computing TSYS etc.
+    min_scale_reference: False or float
+        EXPERIMENTAL: rescale the "reference" to be the scan of lowest TSYS,
+        then use the value of min_scale_reference as a percentile to determine
+        the integration to use from that scan.  Try 10.
     """
 
     if refscan1 is not None or refscan2 is not None:
@@ -181,6 +185,16 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         tsys = ( offmean / diffmean * tcal + tcal/2.0 )
         print "Scan %4i:  TSYS=%12.3f" % (scanid,tsys)
         data['TSYS'][whscan] = tsys
+
+    # experimental: try to rescale the "reference" scan to be the minimum
+    if min_scale_reference:
+        min_tsys = np.argmin(data['TSYS'])
+        whmin = data['SCAN'][min_tsys]
+        whscan = data['SCAN'] == whmin
+        r1 = np.percentile(dataarr[whscan*OKsource*CalOn,exslice], min_scale_reference, axis=0)
+        r2 = np.percentile(dataarr[whscan*OKsource*CalOff,exslice], min_scale_reference, axis=0)
+        ref_scale = np.median((r1+r2)/2.0)
+        print "EXPERIMENTAL: min_scale_reference = ",ref_scale
     
     for specindOn,specindOff in zip(np.where(OKsource*CalOn)[0],np.where(OKsource*CalOff)[0]):
 
@@ -196,6 +210,7 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         spec = (specOn + specOff)/2.0
         LSTspec = data['LST'][specindOn]
 
+        # this "if" test is no longer necessary
         if refscans is not None:
             # find the reference scan closest to the current scan
             # (LSTspec is a number, LSTrefs is an array, probably length 2)
@@ -216,6 +231,10 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
 
         # LINEAR interpolation between the reference scans
         specRef = (specref2-specref1)/LSTspread*(LSTspec-LSTref1) + specref1
+        # EXPERIMENTAL
+        if min_scale_reference:
+            print "Rescaling specRef from ",specRef[exslice].mean()," to ",ref_scale
+            specRef = specRef/specRef[exslice].mean() * ref_scale
 
         # use a templated OFF spectrum
         # (e.g., one that has had spectral lines interpolated over)
