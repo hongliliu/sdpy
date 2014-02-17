@@ -53,7 +53,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
                         off_template=None, filepyfits=None,
                         refscan1=None, refscan2=None,
                         exclude_spectral_ends=10., extension=1,
-                        min_scale_reference=False
+                        min_scale_reference=False,
+                        verbose=1,
                        ):
     """
 
@@ -94,6 +95,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         EXPERIMENTAL: rescale the "reference" to be the scan of lowest TSYS,
         then use the value of min_scale_reference as a percentile to determine
         the integration to use from that scan.  Try 10.
+    verbose: int
+        Level of verbosity.  0 is none, 1 is some, 2 is very, 3 is very lots
     """
 
     if refscan1 is not None or refscan2 is not None:
@@ -132,7 +135,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
     if sourcename is None and scanrange is None:
         raise IndexError("Must specify a source name and/or a scan range")
 
-    print "Beginning scan selection and calibration for sampler %s and feed %s" % (sampler,feednum)
+    if verbose:
+        print "Beginning scan selection and calibration for sampler %s and feed %s" % (sampler,feednum)
 
     CalOff = (data['CAL']=='F')
     CalOn  = (data['CAL']=='T')
@@ -166,7 +170,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
     else:
         raise TypeError("Must specify reference scans as a list of scan numbers.")
 
-    print "Beginning calibration of %i scans." % ((OKsource*CalOn).sum())
+    if verbose:
+        print "Beginning calibration of %i scans." % ((OKsource*CalOn).sum())
 
     if ((OKsource*CalOn).sum()) == 0:
         import pdb; pdb.set_trace()
@@ -185,7 +190,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         diffmean = onmean-offmean
 
         tsys = ( offmean / diffmean * tcal + tcal/2.0 )
-        print "Scan %4i:  TSYS=%12.3f" % (scanid,tsys)
+        if verbose > 1:
+            print "Scan %4i:  TSYS=%12.3f" % (scanid,tsys)
         data['TSYS'][whscan] = tsys
 
     # experimental: try to rescale the "reference" scan to be the minimum
@@ -196,7 +202,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         r1 = np.percentile(dataarr[whscan*OKsource*CalOn,exslice], min_scale_reference, axis=0)
         r2 = np.percentile(dataarr[whscan*OKsource*CalOff,exslice], min_scale_reference, axis=0)
         ref_scale = np.median((r1+r2)/2.0)
-        print "EXPERIMENTAL: min_scale_reference = ",ref_scale
+        if verbose:
+            print "EXPERIMENTAL: min_scale_reference = ",ref_scale
     
     for specindOn,specindOff in zip(np.where(OKsource*CalOn)[0],np.where(OKsource*CalOff)[0]):
 
@@ -235,7 +242,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         specRef = (specref2-specref1)/LSTspread*(LSTspec-LSTref1) + specref1
         # EXPERIMENTAL
         if min_scale_reference:
-            print "Rescaling specRef from ",specRef[exslice].mean()," to ",ref_scale
+            if verbose > 2:
+                print "Rescaling specRef from ",specRef[exslice].mean()," to ",ref_scale
             specRef = specRef/specRef[exslice].mean() * ref_scale
 
         # use a templated OFF spectrum
