@@ -52,7 +52,9 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
                         clobber=True, tau=0.0, obsmode=None, refscans=None,
                         off_template=None, filepyfits=None,
                         refscan1=None, refscan2=None,
-                        exclude_spectral_ends=10., extension=1):
+                        exclude_spectral_ends=10., extension=1,
+                        min_scale_reference=False
+                       ):
     """
 
     Parameters
