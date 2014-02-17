@@ -190,8 +190,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
 
     # experimental: try to rescale the "reference" scan to be the minimum
     if min_scale_reference:
-        min_tsys = np.argmin(data['TSYS'])
-        whmin = data['SCAN'][min_tsys]
+        min_tsys = np.argmin(data['TSYS'][OKsource])
+        whmin = data['SCAN'][OKsource][min_tsys]
         whscan = data['SCAN'] == whmin
         r1 = np.percentile(dataarr[whscan*OKsource*CalOn,exslice], min_scale_reference, axis=0)
         r2 = np.percentile(dataarr[whscan*OKsource*CalOff,exslice], min_scale_reference, axis=0)
