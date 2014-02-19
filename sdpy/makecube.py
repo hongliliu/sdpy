@@ -629,11 +629,12 @@ def _fix_ms_kms_file(filename):
 try:
     # requires agpy.  Might not work
     from agpy import cubes
+    from FITS_tools import strip_headers
 
     def make_flats(cubename,vrange=[0,10],noisevrange=[-100,-50],suffix='_sub.fits'):
         cubefile = pyfits.open(cubename+suffix)
         cubefile[0].header = _fix_ms_kms_header(cubefile[0].header)
-        flathead = cubes.flatten_header(cubefile[0].header)
+        flathead = strip_headers.flatten_header(cubefile[0].header)
         integrated = cubes.integ(cubefile,vrange,zunits='wcs')[0]
         if integrated.shape != cubefile[0].data.shape[1:]:
             raise ValueError("Cube integrated to incorrect size.  Major error.  Badness.")

@@ -179,7 +179,7 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
     if ((OKsource*CalOn).sum()) == 0:
         import pdb; pdb.set_trace()
 
-    compute_tsys(data, tsysmode=tsysmode, OKsource=OKsource, CalOn=CalOn,
+    compute_tsys(data, tsysmethod=tsysmethod, OKsource=OKsource, CalOn=CalOn,
                  CalOff=CalOff, exslice=exslice, verbose=verbose)
 
     # experimental: try to rescale the "reference" scan to be the minimum
@@ -271,7 +271,7 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         return filepyfits,data,colsP
 
 
-def compute_tsys(data, tsysmode='perscan', OKsource=None, CalOn=None,
+def compute_tsys(data, tsysmethod='perscan', OKsource=None, CalOn=None,
                  CalOff=None, verbose=False, exslice=slice(None)):
     """
     Calculate the TSYS vector for a set of scans
@@ -283,7 +283,7 @@ def compute_tsys(data, tsysmode='perscan', OKsource=None, CalOn=None,
 
     dataarr = data['DATA']
 
-    if tsysmode == 'perscan':
+    if tsysmethod == 'perscan':
         # compute TSYS on a scan-by-scan basis to avoid problems with saturated TSYS.
         scannumbers = np.unique(data['SCAN'][OKsource])
         for scanid in scannumbers:
@@ -301,7 +301,7 @@ def compute_tsys(data, tsysmode='perscan', OKsource=None, CalOn=None,
             if verbose > 1:
                 print "Scan %4i:  TSYS=%12.3f" % (scanid,tsys)
             data['TSYS'][whscan] = tsys
-    elif tsysmode == 'perint':
+    elif tsysmethod == 'perint':
         on_data = dataarr[CalOn*OKsource,exslice]
         off_data = dataarr[CalOff*OKsource,exslice]
         tcal = data['TCAL'][CalOn*OKsource]
