@@ -4,7 +4,8 @@ try:
 except ImportError:
     import pyfits
     import pywcs
-import coords
+#import coords
+from astropy import coordinates
 import numpy as np
 import matplotlib
 import pylab
@@ -117,8 +118,10 @@ def coord_iterator(data,coordsys_out='galactic'):
             if coordsys_out == 'galactic':
                 yield data.GLON[ii],data.GLAT[ii]
             elif coordsys_out in ('celestial','radec'):
-                pos = coords.Position([data.GLON[ii],data.GLAT[ii]],system='galactic')
-                ra,dec = pos.j2000()
+                pos = coordinates.Galactic(data.GLON[ii],data.GLAT[ii],unit=('deg','deg'))
+                ra,dec = pos.icrs.ra.deg,pos.icrs.dec.deg
+                #pos = coords.Position([data.GLON[ii],data.GLAT[ii]],system='galactic')
+                #ra,dec = pos.j2000()
                 yield ra,dec
     elif hasattr(data,'CRVAL2') and hasattr(data,'CRVAL3'):
         if 'RA' in data.CTYPE2:
@@ -129,8 +132,10 @@ def coord_iterator(data,coordsys_out='galactic'):
             raise Exception("CRVAL exists, but RA/GLON not in CTYPE")
         for ii in xrange(data.DATA.shape[0]):
             if coordsys_out == 'galactic' and coordsys_in == 'celestial':
-                pos = coords.Position([data.CRVAL2[ii],data.CRVAL3[ii]])
-                glon,glat = pos.galactic()
+                pos = coordinates.ICRS(data.CRVAL2[ii],data.CRVAL3[ii],unit=('deg','deg'))
+                glon,glat = pos.galactic.l.deg, pos.galactic.b.deg
+                #pos = coords.Position([data.CRVAL2[ii],data.CRVAL3[ii]])
+                #glon,glat = pos.galactic()
                 yield glon,glat
             elif coordsys_out in ('celestial','radec') or coordsys_in==coordsys_out:
                 yield data.CRVAL2[ii],data.CRVAL3[ii]
@@ -643,7 +648,8 @@ try:
 
 
 except:
-    pass
+    def make_flats(*args, **kwargs):
+        print "Make flats did not import"
 
 def make_taucube(cubename,continuum=0.0,continuum_units='K',TCMB=2.7315,
                  etamb=1., suffix="_sub.fits", outsuffix='.fits',

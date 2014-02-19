@@ -55,6 +55,7 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
                         exclude_spectral_ends=10., extension=1,
                         min_scale_reference=False,
                         verbose=1,
+                        tsysmethod='perscan',
                        ):
     """
 
@@ -95,6 +96,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         EXPERIMENTAL: rescale the "reference" to be the scan of lowest TSYS,
         then use the value of min_scale_reference as a percentile to determine
         the integration to use from that scan.  Try 10.
+    tsysmethod: 'perscan' or 'perint'
+        Compute tsys for each scan or for each integration?
     verbose: int
         Level of verbosity.  0 is none, 1 is some, 2 is very, 3 is very lots
     """
@@ -176,23 +179,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
     if ((OKsource*CalOn).sum()) == 0:
         import pdb; pdb.set_trace()
 
-    # compute TSYS on a scan-by-scan basis to avoid problems with saturated TSYS.
-    scannumbers = np.unique(data['SCAN'][OKsource])
-    for scanid in scannumbers:
-        whscan = data['SCAN'] == scanid
-
-        on_data = dataarr[whscan*CalOn,exslice]
-        off_data = dataarr[whscan*CalOff,exslice]
-        tcal = np.median(data['TCAL'][whscan])
-
-        offmean = np.median(off_data,axis=0).mean()
-        onmean  = np.median(on_data,axis=0).mean()
-        diffmean = onmean-offmean
-
-        tsys = ( offmean / diffmean * tcal + tcal/2.0 )
-        if verbose > 1:
-            print "Scan %4i:  TSYS=%12.3f" % (scanid,tsys)
-        data['TSYS'][whscan] = tsys
+    compute_tsys(data, tsysmode=tsysmode, OKsource=OKsource, CalOn=CalOn,
+                 CalOff=CalOff, exslice=exslice, verbose=verbose)
 
     # experimental: try to rescale the "reference" scan to be the minimum
     if min_scale_reference:
@@ -283,3 +271,48 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         return filepyfits,data,colsP
 
 
+def compute_tsys(data, tsysmode='perscan', OKsource=None, CalOn=None,
+                 CalOff=None, verbose=False, exslice=slice(None)):
+    """
+    Calculate the TSYS vector for a set of scans
+    """
+    if CalOn is None:
+        CalOn  = (data['CAL']=='T')
+    if CalOff is None:
+        CalOff = (data['CAL']=='F')
+
+    dataarr = data['DATA']
+
+    if tsysmode == 'perscan':
+        # compute TSYS on a scan-by-scan basis to avoid problems with saturated TSYS.
+        scannumbers = np.unique(data['SCAN'][OKsource])
+        for scanid in scannumbers:
+            whscan = data['SCAN'] == scanid
+
+            on_data = dataarr[whscan*CalOn,exslice]
+            off_data = dataarr[whscan*CalOff,exslice]
+            tcal = np.median(data['TCAL'][whscan])
+
+            offmean = np.median(off_data,axis=0).mean()
+            onmean  = np.median(on_data,axis=0).mean()
+            diffmean = onmean-offmean
+
+            tsys = ( offmean / diffmean * tcal + tcal/2.0 )
+            if verbose > 1:
+                print "Scan %4i:  TSYS=%12.3f" % (scanid,tsys)
+            data['TSYS'][whscan] = tsys
+    elif tsysmode == 'perint':
+        on_data = dataarr[CalOn*OKsource,exslice]
+        off_data = dataarr[CalOff*OKsource,exslice]
+        tcal = data['TCAL'][CalOn*OKsource]
+
+        offmean = np.mean(off_data,axis=1)
+        onmean  = np.mean(on_data,axis=1)
+        diffmean = onmean-offmean
+
+        # K / count = tcal / diffmean
+        tsys = ( offmean / diffmean * tcal + tcal/2.0 )
+        data['TSYS'][CalOn*OKsource] = tsys
+        data['TSYS'][CalOff*OKsource] = tsys
+        
+    return data['TSYS']
