@@ -296,6 +296,8 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
     contimage = np.zeros_like(nhits)
     nhits_once = np.zeros_like(nhits)
 
+    if debug > 0:
+        print "Loading data cube ",cubefilename
     # rescale image to weight by number of observations
     image = pyfits.getdata(cubefilename)*nhits
     if debug > 0:
@@ -627,8 +629,7 @@ def _fix_ms_kms_file(filename):
         print "{0} does not exist".format(filename)
 
 try:
-    # requires agpy.  Might not work
-    from agpy import cubes
+    from pyspeckit import cubes
     from FITS_tools import strip_headers
 
     def make_flats(cubename,vrange=[0,10],noisevrange=[-100,-50],suffix='_sub.fits'):
