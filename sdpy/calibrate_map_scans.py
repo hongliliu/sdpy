@@ -46,7 +46,7 @@ def load_data_file(filename, extension=1, dataarr=None, filepyfits=None,
     return data, dataarr, namelist, filepyfits
 
 @print_timing
-def calibrate_cube_data(filename, outfilename, scanrange=[], 
+def calibrate_cube_data(filename, outfilename, scanrange=[],
                         sourcename=None, feednum=1, sampler=0,
                         return_data=False, datapfits=None, dataarr=None,
                         clobber=True, tau=0.0, obsmode=None, refscans=None,
@@ -56,8 +56,38 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
                         min_scale_reference=False,
                         verbose=1,
                         tsysmethod='perscan',
-                       ):
+                        tatm=273.0,
+                        trec=None,
+                        airmass_method='maddalena',
+                        scale_airmass=True,
+                        ):
     """
+    The calibration process in pseudocode:
+
+    # Create a "reference spectrum" on blank sky
+    refspec = mean(refspec_calon,refspec_caloff)
+    # Determine TSYS, the total atmospheric + astrophysical + receiver noise
+    # temperature
+    tsys = tcal * mean_continuum(cal_off) / (mean_continuum(cal_on - cal_off)) + tcal/2.0
+
+    # for "TOTAL POWER" mode
+    # Remove the atmospheric and receiver contribution
+    tsource = tsys - (np.exp(tau*airmass)-1)*tatm - trec
+    tsource_star = tsource * np.exp(tau*airmass)
+
+    # for SIG-REF mode (signal + reference; on/off nod)
+    calSpec = (spec-specRef)/specRef * tsys
+
+
+    How does GBTIDL do it?
+    in dcmeantsys.pro_, the +/-10% edge channels are excluded, and
+        mean_tsys = mean(cal_off) / (mean(cal_on-cal_off)) * tcal + tcal/2.0
+    in dototalpower.pro_, the data is set to tp_data = (cal_on + cal_off) / 2.0
+    in dofullsigref.pro_, tsys is corrected with airmass=1/sin(elev)
+    in dosigref.pro_, sigrefdata = (tpdata - refdata)/refdata * tsys
+
+
+    .. dofullsigref.pro_: http://www.gb.nrao.edu/GBT/DA/gbtidl/release/user/toolbox/dofullsigref.html
 
     Parameters
     ----------
@@ -98,10 +128,25 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         EXPERIMENTAL: rescale the "reference" to be the scan of lowest TSYS,
         then use the value of min_scale_reference as a percentile to determine
         the integration to use from that scan.  Try 10.
+        WARNING: Can cause major problems if obserations occur at highly
+        variable airmass!
     tsysmethod: 'perscan' or 'perint'
         Compute tsys for each scan or for each integration?
     verbose: int
         Level of verbosity.  0 is none, 1 is some, 2 is very, 3 is very lots
+    tatm: float
+        The atmospheric temperature.  Will be subtracted from TSYS using the
+        provided optical depth and assuming a plane-parallel atmosphere, 
+        which is good down to 8 degrees
+        (http://www.gb.nrao.edu/~rmaddale/GBT/HighPrecisionCalibrationFromSingleDishTelescopes.pdf)
+    trec: float
+        Not presently used
+    airmass_method: float
+        Method of airmass determination, either csc(elev) or Ron Maddalena's
+        version
+    scale_airmass: bool
+        If the min_scale_reference method is used, try to re-scale the off
+        position mean by the airmass
     """
 
     if refscan1 is not None or refscan2 is not None:
@@ -192,10 +237,13 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         r1 = np.percentile(dataarr[whscan*OKsource*CalOn,exslice], min_scale_reference, axis=0)
         r2 = np.percentile(dataarr[whscan*OKsource*CalOff,exslice], min_scale_reference, axis=0)
         ref_scale = np.median((r1+r2)/2.0)
+        ref_airmass = elev_to_airmass(data['ELEVATIO'][OKsource][min_tsys],
+                                      method=airmass_method)
         if verbose:
             print "EXPERIMENTAL: min_scale_reference = ",ref_scale
     
-    for specindOn,specindOff in zip(np.where(OKsource*CalOn)[0],np.where(OKsource*CalOff)[0]):
+    for specindOn,specindOff in zip(np.where(OKsource*CalOn)[0],
+                                    np.where(OKsource*CalOff)[0]):
 
         for K in namelist:
             if K != 'DATA':
@@ -203,6 +251,11 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
             else:
                 # should this be speclen or 4096?  Changing to speclen...
                 newdatadict['DATA'].append(np.zeros(speclen))
+
+        # http://www.gb.nrao.edu/~rmaddale/Weather/
+        elev = data['ELEVATIO'][specindOn]
+        airmass = elev_to_airmass(elev,
+                                  method=airmass_method)
 
         specOn = dataarr[specindOn,:]
         specOff = dataarr[specindOff,:]
@@ -218,10 +271,10 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
             # the earlier reference scan has index self-1
             if refscannumber == len(refscans) - 1 or LSTrefs[refscannumber] > LSTspec:
                 r1 = refscannumber - 1
-                r2 = refscannumber 
+                r2 = refscannumber
             elif LSTrefs[refscannumber] < LSTspec:
                 r1 = refscannumber
-                r2 = refscannumber + 1 
+                r2 = refscannumber + 1
             LSTref1 = LSTrefs[r1]
             LSTref2 = LSTrefs[r2]
             specref1 = refarray[r1,:]
@@ -232,9 +285,11 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         specRef = (specref2-specref1)/LSTspread*(LSTspec-LSTref1) + specref1
         # EXPERIMENTAL
         if min_scale_reference:
+            airmass_scale = airmass / ref_airmass if scale_airmass else 1
             if verbose > 2:
-                print "Rescaling specRef from ",specRef[exslice].mean()," to ",ref_scale
-            specRef = specRef/specRef[exslice].mean() * ref_scale
+                print "Rescaling specRef from ",specRef[exslice].mean()," to ",ref_scale*airmass_scale
+            specRef = specRef/specRef[exslice].mean() * ref_scale * airmass_scale
+
 
         # use a templated OFF spectrum
         # (e.g., one that has had spectral lines interpolated over)
@@ -246,9 +301,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
 
         tsys = data['TSYS'][specindOn]
         
-        # http://www.gb.nrao.edu/~rmaddale/Weather/
-        elev = data['ELEVATIO'][specindOn]
-        airmass = 1/np.cos((90-elev)/180*np.pi)
+        # I don't think this is right... the correct way is to make sure specRef moves with Spec
+        #tsys_eff = tsys * np.exp(tau*airmass) - (np.exp(tau*airmass)-1)*tatm
         tsys_eff = tsys * np.exp(tau*airmass)
 
         calSpec = (spec-specRef)/specRef * tsys_eff
@@ -262,7 +316,7 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
 
     # Make Table
     cols = [pyfits.Column(name=key,format=formatdict[key],array=value)
-        for key,value in newdatadict.iteritems()]
+            for key,value in newdatadict.iteritems()]
     colsP = pyfits.ColDefs(cols)
     #tablehdu = copy.copy(filepyfits[extension])
     #tablehdu.data = colsP
@@ -298,7 +352,8 @@ def compute_tsys(data, tsysmethod='perscan', OKsource=None, CalOn=None,
         OKsource = np.ones(dataarr.shape[0], dtype='bool')
 
     if tsysmethod == 'perscan':
-        # compute TSYS on a scan-by-scan basis to avoid problems with saturated TSYS.
+        # compute TSYS on a scan-by-scan basis to avoid problems with saturated
+        # TSYS.
         scannumbers = np.unique(data['SCAN'][OKsource])
         for scanid in scannumbers:
             whscan = data['SCAN'] == scanid
@@ -330,3 +385,16 @@ def compute_tsys(data, tsysmethod='perscan', OKsource=None, CalOn=None,
         data['TSYS'][CalOff*OKsource] = tsys
         
     return data['TSYS']
+
+def elev_to_airmass(elev, method='maddalena'):
+    """
+    Calculate the airmass with np.csc(elev) or Ron Maddalena's improved method
+    for low elevations
+
+    http://www.gb.nrao.edu/~rmaddale/GBT/HighPrecisionCalibrationFromSingleDishTelescopes.pdf
+    """
+    if method != 'maddalena':
+        return 1/np.sin(elev/180*np.pi)
+    else:
+        # http://www.gb.nrao.edu/~rmaddale/GBT/HighPrecisionCalibrationFromSingleDishTelescopes.pdf
+        return -0.0234+1.014/np.sin((elev+5.18/(elev+3.35))*np.pi/180.)

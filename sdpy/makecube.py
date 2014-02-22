@@ -634,6 +634,8 @@ try:
 
     def make_flats(cubename,vrange=[0,10],noisevrange=[-100,-50],suffix='_sub.fits'):
         cubefile = pyfits.open(cubename+suffix)
+        if not os.path.exists(cubename+suffix):
+            raise IOError("Missing file %s.  This may be caused by a lack of starlink." % (cubename+suffix))
         cubefile[0].header = _fix_ms_kms_header(cubefile[0].header)
         flathead = strip_headers.flatten_header(cubefile[0].header)
         integrated = cubes.integ(cubefile,vrange,zunits='wcs')[0]
