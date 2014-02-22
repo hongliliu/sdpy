@@ -159,11 +159,11 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         else:
             tauz = tau
             warnings.warn("Use tauz instead of tau",
-                          warnings.DeprecationWarning)
+                          DeprecationWarning)
 
     if refscan1 is not None or refscan2 is not None:
         warnings.warn("Use refscans (a list of scans) rather than ref1,ref2",
-                      warnings.DeprecationWarning)
+                      DeprecationWarning)
         if (type(refscans) == list and not 
             (len(refscans) ==2 and 
              refscans[0] == refscan1 and refscans[1] == refscan2)):
