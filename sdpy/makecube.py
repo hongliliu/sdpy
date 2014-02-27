@@ -24,7 +24,7 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
         coordsys='galactic', ctype3='VELO-LSR', bmaj=0.138888, bmin=0.138888,
         pixsize=24, cunit3='km/s', output_flatheader='header.txt',
         output_cubeheader='cubeheader.txt', cd3=1.0, crval3=0.0,
-        clobber=False, bunit="K", restfreq=None):
+        clobber=False, bunit="K", restfreq=None, radio=True):
     header = pyfits.Header()
     header.update('NAXIS1',naxis1)
     header.update('NAXIS2',naxis2)
@@ -33,9 +33,10 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
     header.update('CD2_2',pixsize/3600.0)
     header.update('EQUINOX',2000.0)
     header.update('SPECSYS','LSRK')
-    header.update('VELREF','257') # CASA convention:
-    # VELREF  =                  259 /1 LSR, 2 HEL, 3 OBS, +256 Radio
-    # COMMENT casacore non-standard usage: 4 LSD, 5 GEO, 6 SOU, 7 GAL
+    if radio:
+        header.update('VELREF','257') # CASA convention:
+        # VELREF  =                  259 /1 LSR, 2 HEL, 3 OBS, +256 Radio
+        # COMMENT casacore non-standard usage: 4 LSD, 5 GEO, 6 SOU, 7 GAL
     if restfreq:
         header.update('RESTFRQ',restfreq)
     if coordsys == 'galactic':
@@ -323,7 +324,10 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
     cubevelo = (np.arange(naxis3)+1-header.get('CRPIX3'))*cd3 + header.get('CRVAL3')
 
     if add_with_kernel:
-        cd = np.abs(wcs.wcs.cd[1,1])
+        if hasattr(wcs.wcs,'cd'):
+            cd = np.abs(wcs.wcs.cd[1,1])
+        else:
+            cd = np.abs(wcs.wcs.cdelt[1])
 
     if velocityrange is not None:
         v1,v4 = velocityrange
@@ -672,12 +676,17 @@ def make_taucube(cubename,continuum=0.0,continuum_units='K',TCMB=2.7315,
         if not hasattr(tex,'unit'):
             tex = tex * u.K
         T0 = (constants.h * linefreq / constants.k_B).to(u.K)
-        # TB is the "beam temperature" background-subtracted (from Rohlfs & Wilson)
-        TB = (cubefile[0].data/etamb + continuum/etamb)*u.K
-        tau = -np.log(1-(TB/T0)*( (np.exp(T0/tex)-1)**-1  - (np.exp(T0/TCMB)-1)**-1 )**-1)
+        # TB is the "beam temperature"
+        TB = (cubefile[0].data/etamb + continuum/etamb + TCMB)*u.K
+        TBG = (continuum/etamb + TCMB)*u.K
+
+        tau = (-np.log((TB-tex) / (TBG-tex))).value
     else:
-        # Works in low-tau regime
-        tau = -np.log( (TCMB+cubefile[0].data/etamb+continuum/etamb) / (TCMB+continuum/etamb) )
+        # Works in low-tex regime
+        TBG = continuum/etamb + TCMB
+        TB = (cubefile[0].data/etamb + TBG)
+        tau = -np.log(TB / TBG)
+
     cubefile[0].data = tau
     cubefile[0].header['BUNIT']='tau'
     cubefile.writeto(cubename.replace("cube","taucube")+outsuffix,clobber=True)
