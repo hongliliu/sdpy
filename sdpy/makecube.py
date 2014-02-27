@@ -324,7 +324,7 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
     cubevelo = (np.arange(naxis3)+1-header.get('CRPIX3'))*cd3 + header.get('CRVAL3')
 
     if add_with_kernel:
-        if hasattr(wcs.wcs,'cd'):
+        if wcs.wcs.has_cd():
             cd = np.abs(wcs.wcs.cd[1,1])
         else:
             cd = np.abs(wcs.wcs.cdelt[1])
