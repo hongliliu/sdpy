@@ -21,10 +21,12 @@ except ImportError:
     pass
 
 def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
-        coordsys='galactic', ctype3='VELO-LSR', bmaj=0.138888, bmin=0.138888,
-        pixsize=24, cunit3='km/s', output_flatheader='header.txt',
-        output_cubeheader='cubeheader.txt', cd3=1.0, crval3=0.0,
-        clobber=False, bunit="K", restfreq=None, radio=True):
+                    coordsys='galactic', ctype3='VELO-LSR', bmaj=0.138888,
+                    bmin=0.138888, pixsize=24, cunit3='km/s',
+                    output_flatheader='header.txt',
+                    output_cubeheader='cubeheader.txt', cd3=1.0, crval3=0.0,
+                    crpix3=None, clobber=False, bunit="K", restfreq=None,
+                    radio=True):
     header = pyfits.Header()
     header.update('NAXIS1',naxis1)
     header.update('NAXIS2',naxis2)
@@ -55,7 +57,10 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
         header.update('CRVAL2',centery)
     header.update('BMAJ',bmaj)
     header.update('BMIN',bmin)
-    header.update('CRPIX3',naxis3/2-1)
+    if crpix3 is None:
+        header.update('CRPIX3',naxis3/2-1)
+    else:
+        header.update('CRPIX3',crpix3)
     header.update('CRVAL3',crval3)
     header.update('CD3_3',cd3)
     header.update('CTYPE3',ctype3)
@@ -72,12 +77,15 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
     return header
 
 def make_blank_images(cubeprefix, flatheader='header.txt',
-        cubeheader='cubeheader.txt', clobber=False):
+                      cubeheader='cubeheader.txt', clobber=False):
 
     flathead = pyfits.Header.fromtextfile(flatheader)
     header = pyfits.Header.fromtextfile(cubeheader)
     naxis1,naxis2,naxis3 = header.get('NAXIS1'),header.get('NAXIS2'),header.get('NAXIS3')
-    blankcube = np.zeros([naxis3,naxis2,naxis1])
+    cubeshape = [naxis3,naxis2,naxis1]
+    if np.product(cubeshape) > 2048**3:
+        raise ValueError("Error: attempting to create cube with > 8 gigapixels")
+    blankcube = np.zeros(cubeshape)
     blanknhits = np.zeros([naxis2,naxis1])
     print "Blank image size: ",naxis1,naxis2,naxis3,".  Blankcube shape: ",blankcube.shape
     file1 = pyfits.PrimaryHDU(header=header,data=blankcube)
@@ -257,7 +265,20 @@ def generate_continuum_map(filename, pixsize=24, **kwargs):
     HDU2.data = nhits
     HDU2.writeto(outpre+"_nhits.fits",clobber=True)
 
-def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
+
+def add_file_to_cube(filename, cubefilename, debug=False, **kwargs):
+    print "Loading file %s" % filename
+    data = pyfits.getdata(filename)
+    fileheader = pyfits.getheader(filename)
+
+    if debug:
+        print "Loaded ",filename,"...",
+
+    return add_data_to_cube(cubefilename, filename=filename, data=data,
+                            fileheader=fileheader, debug=debug, **kwargs)
+
+def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
+                     flatheader='header.txt',
                      cubeheader='cubeheader.txt', nhits=None, wcstype='',
                      smoothto=1, baselineorder=5, velocityrange=None,
                      excludefitrange=None, noisecut=np.inf, do_runscript=False,
@@ -269,7 +290,8 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
                      velocity_offset=0.0, negative_mean_cut=None,
                      add_with_kernel=False, kernel_fwhm=None, fsw=False,
                      diagnostic_plot_name=None, chmod=False,
-                     continuum_prefix=None):
+                     continuum_prefix=None,
+                     varweight=False):
     """
     Given a .fits file that contains a binary table of spectra (e.g., as
     you would get from the GBT mapping "pipeline" or the reduce_map.pro aoidl
@@ -279,12 +301,6 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
         Amount to add to the velocity vector before adding it to the cube
         (useful for FSW observations)
     """
-    print "Loading file %s" % filename
-    data = pyfits.getdata(filename)
-    fileheader = pyfits.getheader(filename)
-
-    if debug:
-        print "Loaded ",filename,"...",
 
     if type(nhits) is str:
         if debug > 0:
@@ -304,6 +320,7 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
     if debug > 0:
         print "nhits statistics: mean, std, nzeros, size",nhits.mean(),nhits.std(),np.sum(nhits==0), nhits.size
         print "Image statistics: mean, std, nzeros, size",image.mean(),image.std(),np.sum(image==0), image.size, np.sum(np.isnan(image))
+        print "nhits shape: ",nhits.shape
     # default is to set empty pixels to NAN; have to set them
     # back to zero
     image[image!=image] = 0.0
@@ -350,15 +367,15 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
     #    print "Spectra have CD=%0.2f, cube has CD=%0.2f.  Will smooth & interpolate." % (cdelt,cd3)
 
     if progressbar and 'ProgressBar' in globals():
-        pb = ProgressBar()
-    else:
-        pb = lambda x: x
+        pb = ProgressBar(maxval=len(data))
+        pb.start()
+        counter = 0
 
     skipped = []
 
-    for spectrum,pos,velo in pb(zip(data_iterator(data,fsw=fsw),
-                                    coord_iterator(data,coordsys_out=coordsys),
-                                    velo_iterator(data,linefreq=linefreq))):
+    for spectrum,pos,velo in zip(data_iterator(data,fsw=fsw),
+                                 coord_iterator(data,coordsys_out=coordsys),
+                                 velo_iterator(data,linefreq=linefreq)):
         glon,glat = pos
         cdelt = velo[1]-velo[0]
         if cdelt < 0:
@@ -368,6 +385,13 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
             if debug > 2:
                 print "Reversed spectral axis... ",
 
+        if velo.max() < cubevelo.min() or velo.min() > cubevelo.max():
+            raise ValueError("Data out of range.")
+
+        if progressbar:
+            pb.update(counter)
+            counter+=1
+
         velo += velocity_offset
 
         if glon != 0 and glat != 0:
@@ -376,7 +400,16 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
                 print "At point ",x,y," ...",
             if abs(cdelt) < abs(cd3) and allow_smooth:
                 # need to smooth before interpolating to preserve signal
-                kernel = np.exp(-(np.linspace(-5,5,11)**2)/(2.0*abs(cd3/cdelt/2.35)**2))
+                kernwidth = abs(cd3/cdelt/2.35)
+                if kernwidth > 2 and kernwidth < 10:
+                    xr = kernwidth*5
+                    npx = np.ceil(xr*2 + 1)
+                elif kernwidth > 10:
+                    raise ValueError('Too much smoothing')
+                else:
+                    xr = 5
+                    npx = 11
+                kernel = np.exp(-(np.linspace(-xr,xr,npx)**2)/(2.0*kernwidth**2))
                 kernel /= kernel.sum()
                 smspec = np.convolve(spectrum,kernel,mode='same')
                 datavect = np.interp(cubevelo,velo,smspec)
@@ -422,6 +455,12 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
                 continue
             if debug > 2:
                 print "did not skip...",
+
+            if varweight:
+                weight = 1./noiseestimate**2
+            else:
+                weight = 1
+
             if 0 < int(np.round(x)) < naxis1 and 0 < int(np.round(y)) < naxis2:
                 if add_with_kernel:
                     fwhm = np.sqrt(8*np.log(2))
@@ -430,6 +469,8 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
                         kernel_size = kd = 5
                     if kernel_size % 2 == 0:
                         kernel_size = kd = kernel_size+1
+                    if kernel_size > 100:
+                        raise ValueError("Huge kernel - are you sure?")
                     kernel_middle = mid = (kd-1)/2.
                     xinds,yinds = (np.mgrid[:kd,:kd]-mid+np.array([np.round(x),np.round(y)])[:,None,None]).astype('int')
                     kernel2d = np.exp(-((xinds-x)**2+(yinds-y)**2)/(2*(kernel_fwhm/fwhm/cd)**2))
@@ -438,17 +479,29 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
                     vect_to_add = np.outer(datavect[ind1:ind2],kernel2d).reshape([dim1,kd,kd])
                     vect_to_add[True-OK] = 0
 
-                    image[ind1:ind2,yinds,xinds] += vect_to_add
+                    # need to slice out edges
+                    if yinds.max() >= naxis2 or yinds.min() < 0:
+                        yok = (yinds[0,:] < naxis2) & (yinds[0,:] >= 0)
+                        xinds,yinds = xinds[:,yok],yinds[:,yok]
+                        vect_to_add = vect_to_add[:,:,yok]
+                        kernel2d = kernel2d[:,yok]
+                    if xinds.max() >= naxis1 or xinds.min() < 0:
+                        xok = (xinds[:,0] < naxis1) & (xinds[:,0] >= 0)
+                        xinds,yinds = xinds[xok,:],yinds[xok,:]
+                        vect_to_add = vect_to_add[:,xok,:]
+                        kernel2d = kernel2d[xok,:]
+
+                    image[ind1:ind2,yinds,xinds] += vect_to_add*weight
                     # NaN spectral bins are not appropriately downweighted... but they shouldn't exist anyway...
-                    nhits[yinds,xinds] += kernel2d
-                    contimage[yinds,xinds] += kernel2d * contestimate
-                    nhits_once[yinds,xinds] += kernel2d
+                    nhits[yinds,xinds] += kernel2d*weight
+                    contimage[yinds,xinds] += kernel2d * contestimate*weight
+                    nhits_once[yinds,xinds] += kernel2d*weight
 
                 else:
-                    image[ind1:ind2,int(np.round(y)),int(np.round(x))][OK]  += datavect[ind1:ind2][OK]
-                    nhits[int(np.round(y)),int(np.round(x))]     += 1
-                    contimage[int(np.round(y)),int(np.round(x))] += contestimate
-                    nhits_once[int(np.round(y)),int(np.round(x))] += 1
+                    image[ind1:ind2,int(np.round(y)),int(np.round(x))][OK]  += datavect[ind1:ind2][OK]*weight
+                    nhits[int(np.round(y)),int(np.round(x))]     += weight
+                    contimage[int(np.round(y)),int(np.round(x))] += contestimate*weight
+                    nhits_once[int(np.round(y)),int(np.round(x))] += weight
 
                 if debug > 2:
                     print "Z-axis indices are ",ind1,ind2,"...",
@@ -456,8 +509,7 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
                 skipped.append(False)
             else:
                 skipped.append(True)
-                print "Skipped a data point at %f,%f in file %s because it's out of the grid" % (x,y,filename)
-        #import pdb; pdb.set_trace()
+                print "Skipped a data point at x,y=%f,%f lon,lat=%f,%f in file %s because it's out of the grid" % (x,y,glon,glat,filename)
         #raise Exception
 
     if excludefitrange is not None:
@@ -525,11 +577,12 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
         print "subcube shape: ",subcube.shape
 
     H = header.copy()
-    for k,v in fileheader.iteritems():
-        if 'RESTFRQ' in k or 'RESTFREQ' in k:
-            header.update(k,v)
-        #if k[0] == 'C' and '1' in k and k[-1] != '1':
-        #    header.update(k.replace('1','3'), v)
+    if fileheader is not None:
+        for k,v in fileheader.iteritems():
+            if 'RESTFRQ' in k or 'RESTFREQ' in k:
+                header.update(k,v)
+            #if k[0] == 'C' and '1' in k and k[-1] != '1':
+            #    header.update(k.replace('1','3'), v)
     header.fromtextfile(cubeheader)
     for k,v in H.iteritems():
         header.update(k,v)
@@ -599,6 +652,8 @@ def add_file_to_cube(filename, cubefilename, flatheader='header.txt',
     print >>scriptfile,("# Fix STARLINK's failure to respect header keywords.")
     print >>scriptfile,('sethead %s_smooth.fits RESTFRQ=`gethead RESTFRQ %s.fits`' % (pre,pre))
     scriptfile.close()
+
+    pb.finish()
 
     if chmod:
         os.system("chmod +x "+outpre+"_starlink.sh")
