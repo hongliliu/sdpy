@@ -36,7 +36,7 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
     header.update('EQUINOX',2000.0)
     header.update('SPECSYS','LSRK')
     if radio:
-        header.update('VELREF','257') # CASA convention:
+        header.update('VELREF',257) # CASA convention:
         # VELREF  =                  259 /1 LSR, 2 HEL, 3 OBS, +256 Radio
         # COMMENT casacore non-standard usage: 4 LSD, 5 GEO, 6 SOU, 7 GAL
     if restfreq:
@@ -156,9 +156,19 @@ def velo_iterator(data,linefreq=None):
         if hasattr(data,'SPECTRA'):
             npix = data.SPECTRA.shape[1]
             CRPIX = data.CRPIX1[ii]
-            CRVAL = data.CRVAL1[ii]
-            CDELT = data.CDELT1[ii]
-            velo = (np.arange(npix)+1-CRPIX)*CDELT + CRVAL
+            # this is the OPTICAL convention!!
+            #CRVAL = data.CRVAL1[ii]
+            #CDELT = data.CDELT1[ii]
+            #velo = (np.arange(npix)+1-CRPIX)*CDELT + CRVAL
+            CRVAL = data.CRVAL1F[ii]
+            CDELT = data.CDELT1F[ii]
+            vlsr_off = data.VLSR_OFF[ii]
+            freq = (np.arange(npix)+1-CRPIX)*CDELT + CRVAL
+            if linefreq is None:
+                linefreq = data.RESTFREQ[ii]
+            # I still don't know if the sign of VLSR_OFF is right,
+            # but it should be in km/s at least...
+            velo = (linefreq-freq)/linefreq * 2.99792458e5 - vlsr_off
         elif hasattr(data,'DATA'):
             npix = data.DATA.shape[1]
             #restfreq = data.RESTFREQ[ii]
