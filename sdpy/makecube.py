@@ -279,7 +279,7 @@ def add_file_to_cube(filename, cubefilename, debug=False, **kwargs):
 
 def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                      flatheader='header.txt',
-                     cubeheader='cubeheader.txt', nhits=None, wcstype='',
+                     cubeheader='cubeheader.txt', nhits=None,
                      smoothto=1, baselineorder=5, velocityrange=None,
                      excludefitrange=None, noisecut=np.inf, do_runscript=False,
                      linefreq=None, allow_smooth=True,
@@ -291,6 +291,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                      add_with_kernel=False, kernel_fwhm=None, fsw=False,
                      diagnostic_plot_name=None, chmod=False,
                      continuum_prefix=None,
+                     debug_breakpoint=False,
                      varweight=False):
     """
     Given a .fits file that contains a binary table of spectra (e.g., as
@@ -307,8 +308,14 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
             print "Loading nhits from %s" % nhits
         nhits = pyfits.getdata(nhits)
     elif type(nhits) is not np.ndarray:
-        raise Exception( "nhits must be a .fits file or an ndarray, but it is ",type(nhits) )
+        raise TypeError("nhits must be a .fits file or an ndarray, but it is ",type(nhits))
     naxis2,naxis1 = nhits.shape
+
+    if velocity_offset and not fsw:
+        raise ValueError("Using a velocity offset, but obs type is not "
+                         "frequency switched; this is almost certainly wrong, "
+                         "but if there's a case for it I'll remove this.")
+
 
     contimage = np.zeros_like(nhits)
     nhits_once = np.zeros_like(nhits)
@@ -330,10 +337,6 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     if debug > 0:
         print "Image statistics: mean, std, nzeros, size",image.mean(),image.std(),np.sum(image==0), image.size
 
-    # the input spectra are expected to have spectra on the 1st axis
-    # cdelt = fileheader.get('CD1_1') if fileheader.get('CD1_1') else fileheader.get('CDELT1'+wcstype)
-    # (not used - overwritten below)
-
     flathead = pyfits.Header.fromtextfile(flatheader)
     naxis3 = image.shape[0]
     wcs = pywcs.WCS(flathead)
@@ -350,12 +353,22 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
         v1,v4 = velocityrange
         ind1 = np.argmin(np.abs(np.floor(v1-cubevelo)))
         ind2 = np.argmin(np.abs(np.ceil(v4-cubevelo)))+1
+
         # stupid hack.  REALLY stupid hack.  Don't crop.
-        if np.abs(ind2-image.shape[0]) < 5: ind2 = image.shape[0]
-        if np.abs(ind1) < 5: ind1 = 0
+        if np.abs(ind2-image.shape[0]) < 5:
+            ind2 = image.shape[0]
+        if np.abs(ind1) < 5:
+            ind1 = 0
+
         #print "Velo match for v1,v4 = %f,%f: %f,%f" % (v1,v4,cubevelo[ind1],cubevelo[ind2])
-        print "Updating CRPIX3 from %i to %i. Cropping to indices %i,%i" % (header.get('CRPIX3'),header.get('CRPIX3')-ind1,ind1,ind2)
-        header.update('CRPIX3',header.get('CRPIX3')-ind1)
+        # print "Updating CRPIX3 from %i to %i. Cropping to indices %i,%i" % (header.get('CRPIX3'),header.get('CRPIX3')-ind1,ind1,ind2)
+        # I think this could be disastrous: cubevelo is already set, but now we're changing how it's set in the header!
+        # I don't think there's any reason to have this in the first place
+        # header.update('CRPIX3',header.get('CRPIX3')-ind1)
+
+        # reset v1,v4 to the points we just selected
+        v1 = cubevelo[ind1]
+        v4 = cubevelo[ind2-1]
     else:
         ind1=0
         ind2 = image.shape[0]
@@ -510,7 +523,10 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
             else:
                 skipped.append(True)
                 print "Skipped a data point at x,y=%f,%f lon,lat=%f,%f in file %s because it's out of the grid" % (x,y,glon,glat,filename)
-        #raise Exception
+
+            if debug_breakpoint:
+                import pdb
+                pdb.set_trace()
 
     if excludefitrange is not None:
         # this block redifining "include" is used for diagnostics (optional)
