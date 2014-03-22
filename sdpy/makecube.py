@@ -160,8 +160,9 @@ def velo_iterator(data,linefreq=None):
             #CRVAL = data.CRVAL1[ii]
             #CDELT = data.CDELT1[ii]
             #velo = (np.arange(npix)+1-CRPIX)*CDELT + CRVAL
-            CRVAL = data.CRVAL1F[ii]
-            CDELT = data.CDELT1F[ii]
+            # MHz to Hz
+            CRVAL = data.CRVAL1F[ii] * 1e6
+            CDELT = data.CDELT1F[ii] * 1e6
             vlsr_off = data.VLSR_OFF[ii]
             freq = (np.arange(npix)+1-CRPIX)*CDELT + CRVAL
             if linefreq is None:
