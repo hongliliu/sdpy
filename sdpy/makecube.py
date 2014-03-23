@@ -172,7 +172,10 @@ def velo_iterator(data,linefreq=None,useFreq=True):
                 if linefreq is None:
                     linefreq = data.RESTFREQ[ii] * u.MHz
                 else:
-                    linefreq = linefreq * u.Hz
+                    try:
+                        linefreq = linefreq.to(u.Hz)
+                    except AttributeError:
+                        linefreq = linefreq * u.Hz
                 # I still don't know if the sign of VLSR_OFF is right,
                 # but it should be in km/s at least...
                 velo_u = (linefreq-freq)/linefreq * constants.c + vlsr_off
