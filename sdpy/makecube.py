@@ -5,20 +5,22 @@ except ImportError:
     import pyfits
     import pywcs
 #import coords
-from astropy import coordinates
+from astropy import coordinates, constants
+from astropy import units as u
 import numpy as np
-import matplotlib
 import pylab
 try:
     import aplpy
 except ImportError:
     pass
 import os
-import copy
 try:
     from progressbar import ProgressBar
 except ImportError:
     pass
+
+# define speed of light for later use
+ckms = constants.c.to(u.km/u.s).value
 
 def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
                     coordsys='galactic', ctype3='VELO-LSR', bmaj=0.138888,
@@ -156,30 +158,33 @@ def coord_iterator(data,coordsys_out='galactic'):
     else:
         raise Exception("No CRVAL or GLON struct in data.")
 
-def velo_iterator(data,linefreq=None):
+def velo_iterator(data,linefreq=None,useFreq=True):
     for ii in xrange(data.CRPIX1.shape[0]):
         if hasattr(data,'SPECTRA'):
             npix = data.SPECTRA.shape[1]
             CRPIX = data.CRPIX1[ii]
-            # this is the OPTICAL convention!!
-            #CRVAL = data.CRVAL1[ii]
-            #CDELT = data.CDELT1[ii]
-            #velo = (np.arange(npix)+1-CRPIX)*CDELT + CRVAL
-            # MHz to Hz
-            CRVAL = data.CRVAL1F[ii] * 1e6
-            CDELT = data.CDELT1F[ii] * 1e6
-            vlsr_off = data.VLSR_OFF[ii]
-            freq = (np.arange(npix)+1-CRPIX)*CDELT + CRVAL
-            if linefreq is None:
-                linefreq = data.RESTFREQ[ii] * 1e6
-            # I still don't know if the sign of VLSR_OFF is right,
-            # but it should be in km/s at least...
-            velo = (linefreq-freq)/linefreq * 2.99792458e5 - vlsr_off
+            if useFreq:
+                # 1e6 MHz to Hz
+                CRVAL = data.CRVAL1F[ii] * u.MHz
+                CDELT = data.CDELT1F[ii] * u.MHz
+                vlsr_off = data.VLSR_OFF[ii] * u.km/u.s
+                freq = (np.arange(npix)+1-CRPIX)*CDELT + CRVAL
+                if linefreq is None:
+                    linefreq = data.RESTFREQ[ii] * u.MHz
+                # I still don't know if the sign of VLSR_OFF is right,
+                # but it should be in km/s at least...
+                velo_u = (linefreq-freq)/linefreq * ckms + vlsr_off
+                velo = velo_u.to(u.km/u.s).value
+            else:
+                # this is the OPTICAL convention!!
+                CRVAL = data.CRVAL1[ii]
+                CDELT = data.CDELT1[ii]
+                velo = (np.arange(npix)+1-CRPIX)*CDELT + CRVAL
         elif hasattr(data,'DATA'):
             npix = data.DATA.shape[1]
             #restfreq = data.RESTFREQ[ii]
-            obsfreq  = data.OBSFREQ[ii]
-            deltaf   = data.CDELT1[ii]
+            obsfreq = data.OBSFREQ[ii]
+            deltaf = data.CDELT1[ii]
             sourcevel = data.VELOCITY[ii]
             CRPIX = data.CRPIX1[ii]
             if linefreq is not None:
@@ -191,15 +196,15 @@ def velo_iterator(data,linefreq=None):
                 #freqarr = (np.arange(npix)+1-CRPIX)*deltaf + restfreq # obsfreq #
                 # trying again, since 2-2 clearly offset from 1-1
                 freqarr = (np.arange(npix)+1-CRPIX)*deltaf + obsfreq
-                velo = (linefreq-freqarr)/linefreq * 2.99792458e5
+                velo = (linefreq-freqarr)/linefreq * ckms
                 #obsfreq = data.OBSFREQ[ii]
                 #cenfreq = obsfreq + (linefreq-restfreq)
                 #crfreq = (CRPIX-1)*deltaf + cenfreq
-                #CRVAL = (crfreq - cenfreq)/cenfreq * 2.99792458e5
-                #CDELT = -1*deltaf/cenfreq * 2.99792458e5
+                #CRVAL = (crfreq - cenfreq)/cenfreq * ckms
+                #CDELT = -1*deltaf/cenfreq * ckms
             else:
                 CRVAL = sourcevel/1000.0
-                CDELT = -1*deltaf/(obsfreq) * 2.99792458e5
+                CDELT = -1*deltaf/(obsfreq) * ckms
                 velo = (np.arange(npix)+1-CRPIX)*CDELT + CRVAL
         yield velo
 
@@ -254,8 +259,8 @@ def generate_continuum_map(filename, pixsize=24, **kwargs):
 
     centerx = (maxx + minx) / 2.0
     centery = (maxy + miny) / 2.0
-    naxis1 = np.ceil( (maxx-minx)/(pixsize/3600.0) )
-    naxis2 = np.ceil( (maxx-minx)/(pixsize/3600.0) )
+    naxis1 = np.ceil((maxx-minx) / (pixsize/3600.0))
+    naxis2 = np.ceil((maxx-minx) / (pixsize/3600.0))
 
     generate_header(centerx, centery, naxis1=naxis1, naxis2=naxis2, naxis3=1,
                     pixsize=pixsize,
@@ -274,8 +279,8 @@ def generate_continuum_map(filename, pixsize=24, **kwargs):
         if glon != 0 and glat != 0:
             x,y = wcs.wcs_sky2pix(glon,glat,0)
             if 0 < int(np.round(x)) < naxis1 and 0 < int(np.round(y)) < naxis2:
-                image[int(np.round(y)),int(np.round(x))]  += datapoint
-                nhits[int(np.round(y)),int(np.round(x))]  += 1
+                image[int(np.round(y)),int(np.round(x))] += datapoint
+                nhits[int(np.round(y)),int(np.round(x))] += 1
             else:
                 print "Skipped a data point at %f,%f in file %s because it's out of the grid" % (x,y,filename)
 
@@ -417,7 +422,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
         if cdelt < 0:
             # for interpolation, require increasing X axis
             spectrum = spectrum[::-1]
-            velo     = velo[::-1]
+            velo = velo[::-1]
             if debug > 2:
                 print "Reversed spectral axis... ",
 
@@ -486,7 +491,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                 skipped.append(True)
                 continue
             elif OK.sum()/float(abs(ind2-ind1)) < 0.5:
-                print "Skipped a data point at %f,%f in file %s because it had %i NANs" % (x,y,filename,np.isnan(datavect[ind1:ind2]).sum() )
+                print "Skipped a data point at %f,%f in file %s because it had %i NANs" % (x,y,filename,np.isnan(datavect[ind1:ind2]).sum())
                 skipped.append(True)
                 continue
             if debug > 2:
@@ -534,8 +539,8 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                     nhits_once[yinds,xinds] += kernel2d*weight
 
                 else:
-                    image[ind1:ind2,int(np.round(y)),int(np.round(x))][OK]  += datavect[ind1:ind2][OK]*weight
-                    nhits[int(np.round(y)),int(np.round(x))]     += weight
+                    image[ind1:ind2,int(np.round(y)),int(np.round(x))][OK] += datavect[ind1:ind2][OK]*weight
+                    nhits[int(np.round(y)),int(np.round(x))] += weight
                     contimage[int(np.round(y)),int(np.round(x))] += contestimate*weight
                     nhits_once[int(np.round(y)),int(np.round(x))] += weight
 
