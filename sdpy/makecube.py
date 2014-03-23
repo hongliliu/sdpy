@@ -81,13 +81,16 @@ def make_blank_images(cubeprefix, flatheader='header.txt',
 
     flathead = pyfits.Header.fromtextfile(flatheader)
     header = pyfits.Header.fromtextfile(cubeheader)
-    naxis1,naxis2,naxis3 = header.get('NAXIS1'),header.get('NAXIS2'),header.get('NAXIS3')
+    naxis1,naxis2,naxis3 = (header.get('NAXIS1'),
+                            header.get('NAXIS2'),
+                            header.get('NAXIS3'))
     cubeshape = [naxis3,naxis2,naxis1]
     if np.product(cubeshape) > 2048**3:
         raise ValueError("Error: attempting to create cube with > 8 gigapixels")
     blankcube = np.zeros(cubeshape)
     blanknhits = np.zeros([naxis2,naxis1])
-    print "Blank image size: ",naxis1,naxis2,naxis3,".  Blankcube shape: ",blankcube.shape
+    print("Blank image size: ",naxis1,naxis2,naxis3,
+          ".  Blankcube shape: ",blankcube.shape)
     file1 = pyfits.PrimaryHDU(header=header,data=blankcube)
     file1.writeto(cubeprefix+".fits",clobber=clobber)
     file2 = pyfits.PrimaryHDU(header=flathead,data=blanknhits)
@@ -119,7 +122,8 @@ def data_iterator(data,continuum=False,fsw=False):
                     sign = 1
                 yield sign * data.DATA[ii,:]
     else:
-        raise Exception("Structure does not have DATA or SPECTRA tags.  Can't use it.  Write your own iterator.")
+        raise Exception("Structure does not have DATA or SPECTRA tags. "
+                        "Can't use it.  Write your own iterator.")
 
 def coord_iterator(data,coordsys_out='galactic'):
     if hasattr(data,'GLON') and hasattr(data,'GLAT'):
@@ -127,10 +131,10 @@ def coord_iterator(data,coordsys_out='galactic'):
             if coordsys_out == 'galactic':
                 yield data.GLON[ii],data.GLAT[ii]
             elif coordsys_out in ('celestial','radec'):
-                pos = coordinates.Galactic(data.GLON[ii],data.GLAT[ii],unit=('deg','deg'))
+                pos = coordinates.Galactic(data.GLON[ii],
+                                           data.GLAT[ii],
+                                           unit=('deg','deg'))
                 ra,dec = pos.icrs.ra.deg,pos.icrs.dec.deg
-                #pos = coords.Position([data.GLON[ii],data.GLAT[ii]],system='galactic')
-                #ra,dec = pos.j2000()
                 yield ra,dec
     elif hasattr(data,'CRVAL2') and hasattr(data,'CRVAL3'):
         if 'RA' in data.CTYPE2:
@@ -141,12 +145,13 @@ def coord_iterator(data,coordsys_out='galactic'):
             raise Exception("CRVAL exists, but RA/GLON not in CTYPE")
         for ii in xrange(data.DATA.shape[0]):
             if coordsys_out == 'galactic' and coordsys_in == 'celestial':
-                pos = coordinates.ICRS(data.CRVAL2[ii],data.CRVAL3[ii],unit=('deg','deg'))
+                pos = coordinates.ICRS(data.CRVAL2[ii],
+                                       data.CRVAL3[ii],
+                                       unit=('deg','deg'))
                 glon,glat = pos.galactic.l.deg, pos.galactic.b.deg
-                #pos = coords.Position([data.CRVAL2[ii],data.CRVAL3[ii]])
-                #glon,glat = pos.galactic()
                 yield glon,glat
-            elif coordsys_out in ('celestial','radec') or coordsys_in==coordsys_out:
+            elif (coordsys_out in ('celestial','radec') or
+                  coordsys_in==coordsys_out):
                 yield data.CRVAL2[ii],data.CRVAL3[ii]
     else:
         raise Exception("No CRVAL or GLON struct in data.")
@@ -166,7 +171,7 @@ def velo_iterator(data,linefreq=None):
             vlsr_off = data.VLSR_OFF[ii]
             freq = (np.arange(npix)+1-CRPIX)*CDELT + CRVAL
             if linefreq is None:
-                linefreq = data.RESTFREQ[ii]
+                linefreq = data.RESTFREQ[ii] * 1e6
             # I still don't know if the sign of VLSR_OFF is right,
             # but it should be in km/s at least...
             velo = (linefreq-freq)/linefreq * 2.99792458e5 - vlsr_off
@@ -216,7 +221,8 @@ def selectsource(data, sampler, sourcename=None, obsmode=None, scanrange=[],
     if scanrange is not []:
         OKsource *= (scanrange[0] <= data['SCAN'])*(data['SCAN'] <= scanrange[1])
     if obsmode is not None:
-        OKsource *= ((obsmode == data.OBSMODE) + ((obsmode+":NONE:TPWCAL") == data.OBSMODE))
+        OKsource *= ((obsmode == data.OBSMODE) +
+                     ((obsmode+":NONE:TPWCAL") == data.OBSMODE))
     if sourcename is None and scanrange is None:
         raise IndexError("Must specify a source name and/or a scan range")
 
@@ -229,26 +235,32 @@ def generate_continuum_map(filename, pixsize=24, **kwargs):
         minx,maxx = data.CRVAL2.min(),data.CRVAL2.max()
         miny,maxy = data.CRVAL3.min(),data.CRVAL3.max()
         if 'RA' in data.CTYPE2:
-            coordsys_in='celestial'
-            minx,miny = coords.Position([minx,miny],system='celestial').galactic()
-            maxx,maxy = coords.Position([maxx,maxy],system='celestial').galactic()
+            #coordsys_in='celestial'
+            cmin = coordinates.ICRS(minx, miny, unit='deg,deg')
+            cmax = coordinates.ICRS(maxy, maxy, unit='deg,deg')
+            minx,miny = cmin.galactic.l.degree, cmin.galactic.b.degree
+            maxx,maxy = cmax.galactic.l.degree, cmax.galactic.b.degree
+            #minx,miny = coords.Position([minx,miny],system='celestial').galactic()
+            #maxx,maxy = coords.Position([maxx,maxy],system='celestial').galactic()
         elif 'GLON' in data.CTYPE2:
-            coordsys_in='galactic'
+            # this block exists because I thought I might have had to do
+            # something extra...
+            pass
+            #coordsys_in='galactic'
     elif hasattr(data,'GLON') and hasattr(data,'GLAT'):
         minx,maxx = data.GLON.min(),data.GLON.max()
         miny,maxy = data.GLAT.min(),data.GLAT.max()
-        coordsys_in='galactic'
+        #coordsys_in='galactic'
 
     centerx = (maxx + minx) / 2.0
     centery = (maxy + miny) / 2.0
     naxis1 = np.ceil( (maxx-minx)/(pixsize/3600.0) )
     naxis2 = np.ceil( (maxx-minx)/(pixsize/3600.0) )
 
-    generate_header(centerx,centery,naxis1=naxis1, naxis2=naxis2, naxis3=1,
-            pixsize=pixsize, 
-            output_flatheader='continuum_flatheader.txt',
-            output_cubeheader='continuum_cubeheader.txt',
-            clobber=True)
+    generate_header(centerx, centery, naxis1=naxis1, naxis2=naxis2, naxis3=1,
+                    pixsize=pixsize,
+                    output_flatheader='continuum_flatheader.txt',
+                    output_cubeheader='continuum_cubeheader.txt', clobber=True)
 
     flathead = pyfits.Header.fromtextfile('continuum_flatheader.txt')
     wcs = pywcs.WCS(flathead)
