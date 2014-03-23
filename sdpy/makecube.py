@@ -175,7 +175,7 @@ def velo_iterator(data,linefreq=None,useFreq=True):
                     linefreq = linefreq * u.Hz
                 # I still don't know if the sign of VLSR_OFF is right,
                 # but it should be in km/s at least...
-                velo_u = (linefreq-freq)/linefreq * ckms + vlsr_off
+                velo_u = (linefreq-freq)/linefreq * constants.c + vlsr_off
                 velo = velo_u.to(u.km/u.s).value
             else:
                 # this is the OPTICAL convention!!
