@@ -178,6 +178,7 @@ def velo_iterator(data,linefreq=None,useFreq=True):
                         linefreq = linefreq * u.Hz
                 # I still don't know if the sign of VLSR_OFF is right,
                 # but it should be in km/s at least...
+                # this is RADIO VELOCITY
                 velo_u = (linefreq-freq)/linefreq * constants.c + vlsr_off
                 velo = velo_u.to(u.km/u.s).value
             else:
@@ -201,6 +202,7 @@ def velo_iterator(data,linefreq=None,useFreq=True):
                 #freqarr = (np.arange(npix)+1-CRPIX)*deltaf + restfreq # obsfreq #
                 # trying again, since 2-2 clearly offset from 1-1
                 freqarr = (np.arange(npix)+1-CRPIX)*deltaf + obsfreq
+                # RADIO VELOCITY
                 velo = (linefreq-freqarr)/linefreq * ckms
                 #obsfreq = data.OBSFREQ[ii]
                 #cenfreq = obsfreq + (linefreq-restfreq)
