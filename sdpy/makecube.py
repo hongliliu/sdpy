@@ -23,7 +23,7 @@ except ImportError:
 ckms = constants.c.to(u.km/u.s).value
 
 def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
-                    coordsys='galactic', ctype3='VRAD-F2V', bmaj=0.138888,
+                    coordsys='galactic', ctype3='VRAD', bmaj=0.138888,
                     bmin=0.138888, pixsize=24, cunit3='km/s',
                     output_flatheader='header.txt',
                     output_cubeheader='cubeheader.txt', cd3=1.0, crval3=0.0,
@@ -375,8 +375,12 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     flathead = pyfits.Header.fromtextfile(flatheader)
     naxis3 = image.shape[0]
     wcs = pywcs.WCS(flathead)
-    cd3 = header.get('CDELT3')
-    cubevelo = (np.arange(naxis3)+1-header.get('CRPIX3'))*cd3 + header.get('CRVAL3')
+    cwcs = pywcs.WCS(header)
+    vwcs = cwcs.sub([pywcs.WCSSUB_SPECTRAL])
+    cubevelo = vwcs.wcs_pix2world(np.arange(naxis3),0)[0] / 1e3
+    #cd3 = header.get('CDELT3')
+    #cubeveloold = (np.arange(naxis3)+1-header.get('CRPIX3'))*cd3 + header.get('CRVAL3')
+    #import pdb; pdb.set_trace()
 
     if add_with_kernel:
         if wcs.wcs.has_cd():
@@ -523,7 +527,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                     xinds,yinds = (np.mgrid[:kd,:kd]-mid+np.array([np.round(x),np.round(y)])[:,None,None]).astype('int')
                     kernel2d = np.exp(-((xinds-x)**2+(yinds-y)**2)/(2*(kernel_fwhm/fwhm/cd)**2))
 
-                    dim1 = datavect.shape[0]
+                    dim1 = ind2-ind1
                     vect_to_add = np.outer(datavect[ind1:ind2],kernel2d).reshape([dim1,kd,kd])
                     vect_to_add[True-OK] = 0
 
@@ -695,7 +699,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     print >>scriptfile,('sub %s %s %s' % (outfn.replace(".fits",".sdf"),outfn.replace(".fits","_baseline.sdf"),outfn.replace(".fits","_sub.sdf")))
     print >>scriptfile,('sqorst %s_sub mode=pixelscale  axis=3 pixscale=%i out=%s_vrebin' % (pre,smoothto,pre))
     print >>scriptfile,('gausmooth %s_vrebin fwhm=1.0 axes=[1,2] out=%s_smooth' % (pre,pre))
-    print >>scriptfile,('#collapse %s estimator=mean axis="VRAD-F2V" low=-400 high=500 out=%s_continuum' % (pre,pre))
+    print >>scriptfile,('#collapse %s estimator=mean axis="VRAD" low=-400 high=500 out=%s_continuum' % (pre,pre))
     print >>scriptfile,('rm %s_sub.fits' % (pre))
     print >>scriptfile,('ndf2fits %s_sub %s_sub.fits' % (pre,pre))
     print >>scriptfile,('rm %s_smooth.fits' % (pre))
