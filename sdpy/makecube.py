@@ -284,7 +284,7 @@ def generate_continuum_map(filename, pixsize=24, **kwargs):
         glon,glat = pos
 
         if glon != 0 and glat != 0:
-            x,y = wcs.wcs_sky2pix(glon,glat,0)
+            x,y = wcs.wcs_world2pix(glon,glat,0)
             if 0 < int(np.round(x)) < naxis1 and 0 < int(np.round(y)) < naxis2:
                 image[int(np.round(y)),int(np.round(x))] += datapoint
                 nhits[int(np.round(y)),int(np.round(x))] += 1
@@ -378,9 +378,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     cwcs = pywcs.WCS(header)
     vwcs = cwcs.sub([pywcs.WCSSUB_SPECTRAL])
     cubevelo = vwcs.wcs_pix2world(np.arange(naxis3),0)[0] / 1e3
-    #cd3 = header.get('CDELT3')
-    #cubeveloold = (np.arange(naxis3)+1-header.get('CRPIX3'))*cd3 + header.get('CRVAL3')
-    #import pdb; pdb.set_trace()
+    cd3 = vwcs.wcs.cdelt[vwcs.wcs.spec] / 1e3
 
     if add_with_kernel:
         if wcs.wcs.has_cd():
@@ -447,7 +445,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
         velo += velocity_offset
 
         if glon != 0 and glat != 0:
-            x,y = wcs.wcs_sky2pix(glon,glat,0)
+            x,y = wcs.wcs_world2pix(glon,glat,0)
             if debug > 2:
                 print "At point ",x,y," ...",
             if abs(cdelt) < abs(cd3) and allow_smooth:
