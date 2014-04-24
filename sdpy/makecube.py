@@ -7,6 +7,7 @@ except ImportError:
 #import coords
 from astropy import coordinates, constants
 from astropy import units as u
+from astropy.convolution import convolve,Gaussian1DKernel,Gaussian2DKernel
 import numpy as np
 import pylab
 try:
@@ -324,6 +325,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                      progressbar=False, coordsys='galactic',
                      velocity_offset=0.0, negative_mean_cut=None,
                      add_with_kernel=False, kernel_fwhm=None, fsw=False,
+                     kernel_function=Gaussian2DKernel,
                      diagnostic_plot_name=None, chmod=False,
                      continuum_prefix=None,
                      debug_breakpoint=False,
@@ -459,8 +461,9 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                 else:
                     xr = 5
                     npx = 11
-                kernel = np.exp(-(np.linspace(-xr,xr,npx)**2)/(2.0*kernwidth**2))
-                kernel /= kernel.sum()
+                #kernel = np.exp(-(np.linspace(-xr,xr,npx)**2)/(2.0*kernwidth**2))
+                #kernel /= kernel.sum()
+                kernel = Gaussian1DKernel(stddev=kernwidth, x_size=npx)
                 smspec = np.convolve(spectrum,kernel,mode='same')
                 datavect = np.interp(cubevelo,velo,smspec)
             else:
@@ -523,7 +526,9 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                         raise ValueError("Huge kernel - are you sure?")
                     kernel_middle = mid = (kd-1)/2.
                     xinds,yinds = (np.mgrid[:kd,:kd]-mid+np.array([np.round(x),np.round(y)])[:,None,None]).astype('int')
-                    kernel2d = np.exp(-((xinds-x)**2+(yinds-y)**2)/(2*(kernel_fwhm/fwhm/cd)**2))
+                    #kernel2d = np.exp(-((xinds-x)**2+(yinds-y)**2)/(2*(kernel_fwhm/fwhm/cd)**2))
+                    kernel2dwidth = (kernel_fwhm/fwhm/cd)
+                    kernel2d = kernel_function(stddev=kernel2dwidth, x_size=kernel_size, y_size=kernel_size).array
 
                     dim1 = ind2-ind1
                     vect_to_add = np.outer(datavect[ind1:ind2],kernel2d).reshape([dim1,kd,kd])
