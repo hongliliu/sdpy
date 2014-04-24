@@ -33,8 +33,8 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
     header.update('NAXIS1',naxis1)
     header.update('NAXIS2',naxis2)
     header.update('NAXIS3',naxis3)
-    header.update('CD1_1',-1*pixsize/3600.0)
-    header.update('CD2_2',pixsize/3600.0)
+    header.update('CDELT1',-1*pixsize/3600.0)
+    header.update('CDELT2',pixsize/3600.0)
     header.update('EQUINOX',2000.0)
     header.update('SPECSYS','LSRK')
     if radio:
@@ -49,7 +49,7 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
         header.update('CRVAL1',centerx)
         header.update('CRVAL2',0)
         header.update('CRPIX1',naxis1/2)
-        header.update('CRPIX2',naxis2/2-centery/header['CD2_2'])
+        header.update('CRPIX2',naxis2/2-centery/header['CDELT2'])
     if coordsys in ('celestial','radec'):
         header.update('CTYPE1','RA---TAN')
         header.update('CTYPE2','DEC--TAN')
@@ -64,7 +64,7 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
     else:
         header.update('CRPIX3',crpix3)
     header.update('CRVAL3',crval3)
-    header.update('CD3_3',cd3)
+    header.update('CDELT3',cd3)
     header.update('CTYPE3',ctype3)
     header.update('CUNIT3',cunit3)
     header.update('BUNIT',bunit)
@@ -72,7 +72,7 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
     del header['NAXIS3']
     del header['CRPIX3']
     del header['CRVAL3']
-    del header['CD3_3' ]
+    del header['CDELT3' ]
     del header['CTYPE3']
     del header['CUNIT3']
     header.totextfile(output_flatheader,clobber=clobber)
@@ -375,7 +375,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     flathead = pyfits.Header.fromtextfile(flatheader)
     naxis3 = image.shape[0]
     wcs = pywcs.WCS(flathead)
-    cd3 = header.get('CD3_3')
+    cd3 = header.get('CDELT3')
     cubevelo = (np.arange(naxis3)+1-header.get('CRPIX3'))*cd3 + header.get('CRVAL3')
 
     if add_with_kernel:
