@@ -23,7 +23,7 @@ except ImportError:
 ckms = constants.c.to(u.km/u.s).value
 
 def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
-                    coordsys='galactic', ctype3='VELO-LSR', bmaj=0.138888,
+                    coordsys='galactic', ctype3='VRAD-F2V', bmaj=0.138888,
                     bmin=0.138888, pixsize=24, cunit3='km/s',
                     output_flatheader='header.txt',
                     output_cubeheader='cubeheader.txt', cd3=1.0, crval3=0.0,
@@ -695,7 +695,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     print >>scriptfile,('sub %s %s %s' % (outfn.replace(".fits",".sdf"),outfn.replace(".fits","_baseline.sdf"),outfn.replace(".fits","_sub.sdf")))
     print >>scriptfile,('sqorst %s_sub mode=pixelscale  axis=3 pixscale=%i out=%s_vrebin' % (pre,smoothto,pre))
     print >>scriptfile,('gausmooth %s_vrebin fwhm=1.0 axes=[1,2] out=%s_smooth' % (pre,pre))
-    print >>scriptfile,('#collapse %s estimator=mean axis="RADI-LSR" low=-400 high=500 out=%s_continuum' % (pre,pre))
+    print >>scriptfile,('#collapse %s estimator=mean axis="VRAD-F2V" low=-400 high=500 out=%s_continuum' % (pre,pre))
     print >>scriptfile,('rm %s_sub.fits' % (pre))
     print >>scriptfile,('ndf2fits %s_sub %s_sub.fits' % (pre,pre))
     print >>scriptfile,('rm %s_smooth.fits' % (pre))
