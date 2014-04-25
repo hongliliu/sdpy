@@ -31,17 +31,18 @@ def load_data_file(filename, extension=1, dataarr=None, filepyfits=None,
     namelist = datapyfits.names
     data = datapyfits
 
-    if dataarr.sum() == 0 or dataarr[-1,:].sum() == 0:
-        print "Reading file using pfits because pyfits didn't read any values!"
-        import pfits
-        if datapfits is not None:
-            data = datapfits
-        else:
-            data = pfits.FITS(filename).get_hdus()[1].get_data()
+    # Don't do this any more; reads whole thing into memory
+    #if dataarr.sum() == 0 or dataarr[-1,:].sum() == 0:
+    #    print "Reading file using pfits because pyfits didn't read any values!"
+    #    import pfits
+    #    if datapfits is not None:
+    #        data = datapfits
+    #    else:
+    #        data = pfits.FITS(filename).get_hdus()[1].get_data()
 
-        dataarr = np.reshape(data['DATA'],data['DATA'].shape[::-1])
+    #    dataarr = np.reshape(data['DATA'],data['DATA'].shape[::-1])
 
-        namelist = data.keys()
+    #    namelist = data.keys()
 
     return data, dataarr, namelist, filepyfits
 
@@ -164,8 +165,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
     if refscan1 is not None or refscan2 is not None:
         warnings.warn("Use refscans (a list of scans) rather than ref1,ref2",
                       DeprecationWarning)
-        if (type(refscans) == list and not 
-            (len(refscans) ==2 and 
+        if (type(refscans) == list and not
+            (len(refscans) ==2 and
              refscans[0] == refscan1 and refscans[1] == refscan2)):
             raise ValueError('refscans does not match refscan1,2')
         elif refscans is None:
@@ -358,31 +359,31 @@ def compute_tsys(data, tsysmethod='perscan', OKsource=None, CalOn=None,
         for scanid in scannumbers:
             whscan = data['SCAN'] == scanid
 
-            on_data = dataarr[whscan*CalOn,exslice]
-            off_data = dataarr[whscan*CalOff,exslice]
+            on_data = dataarr[whscan & CalOn,exslice]
+            off_data = dataarr[whscan & CalOff,exslice]
             tcal = np.median(data['TCAL'][whscan])
 
             offmean = np.median(off_data,axis=0).mean()
             onmean  = np.median(on_data,axis=0).mean()
             diffmean = onmean-offmean
 
-            tsys = ( offmean / diffmean * tcal + tcal/2.0 )
+            tsys = (offmean / diffmean * tcal + tcal/2.0)
             if verbose > 1:
                 print "Scan %4i:  TSYS=%12.3f" % (scanid,tsys)
             data['TSYS'][whscan] = tsys
     elif tsysmethod == 'perint':
-        on_data = dataarr[CalOn*OKsource,exslice]
-        off_data = dataarr[CalOff*OKsource,exslice]
-        tcal = data['TCAL'][CalOn*OKsource]
+        on_data = dataarr[CalOn & OKsource,exslice]
+        off_data = dataarr[CalOff & OKsource,exslice]
+        tcal = data['TCAL'][CalOn & OKsource]
 
         offmean = np.mean(off_data,axis=1)
         onmean  = np.mean(on_data,axis=1)
         diffmean = onmean-offmean
 
         # K / count = tcal / diffmean
-        tsys = ( offmean / diffmean * tcal + tcal/2.0 )
-        data['TSYS'][CalOn*OKsource] = tsys
-        data['TSYS'][CalOff*OKsource] = tsys
+        tsys = (offmean / diffmean * tcal + tcal/2.0)
+        data['TSYS'][CalOn & OKsource] = tsys
+        data['TSYS'][CalOff & OKsource] = tsys
         
     return data['TSYS']
 
@@ -453,10 +454,13 @@ def get_reference(data, refscans, CalOn=None, CalOff=None,
     refarray = np.zeros([len(refscans),speclen])
     LSTrefs  = np.zeros([len(refscans)])
     for II,refscan in enumerate(refscans):
-        OKref = OK * (refscan == data['SCAN'])
+        OKref = OK & (refscan == data['SCAN'])
+        # use "where" in case that reduces amount of stuff read in...
+        CalOnRef = np.nonzero(OKref & CalOn)[0]
+        CalOffRef = np.nonzero(OKref & CalOff)[0]
 
-        specrefon  = np.median(dataarr[OKref*CalOn,:],axis=0)
-        specrefoff = np.median(dataarr[OKref*CalOff,:],axis=0)
+        specrefon  = np.median(dataarr[CalOnRef,:],axis=0)
+        specrefoff = np.median(dataarr[CalOffRef,:],axis=0)
         tcalref    = np.median(data['TCAL'][OKref])
         ref_cntstoK = tcalref/np.mean((specrefon-specrefoff)[exslice])
         #tsysref    = ( np.mean(specrefoff[exslice]) /
