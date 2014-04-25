@@ -329,6 +329,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                      diagnostic_plot_name=None, chmod=False,
                      continuum_prefix=None,
                      debug_breakpoint=False,
+                     default_unit=u.km/u.s,
                      varweight=False):
     """
     Given a .fits file that contains a binary table of spectra (e.g., as
@@ -339,6 +340,9 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
         Amount to add to the velocity vector before adding it to the cube
         (useful for FSW observations)
     """
+
+    #if not default_unit.is_equivalent(u.km/u.s):
+    #    raise TypeError("Default unit is not a velocity equivalent.")
 
     if type(nhits) is str:
         if debug > 0:
@@ -352,6 +356,8 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
         raise ValueError("Using a velocity offset, but obs type is not "
                          "frequency switched; this is almost certainly wrong, "
                          "but if there's a case for it I'll remove this.")
+    if not hasattr(velocity_offset,'unit'):
+        velocity_offset = velocity_offset*default_unit
 
 
     contimage = np.zeros_like(nhits)
@@ -379,8 +385,9 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     wcs = pywcs.WCS(flathead)
     cwcs = pywcs.WCS(header)
     vwcs = cwcs.sub([pywcs.WCSSUB_SPECTRAL])
-    cubevelo = vwcs.wcs_pix2world(np.arange(naxis3),0)[0] / 1e3
-    cd3 = vwcs.wcs.cdelt[vwcs.wcs.spec] / 1e3
+    vunit = u.Unit(vwcs.wcs.cunit[vwcs.wcs.spec])
+    cubevelo = vwcs.wcs_pix2world(np.arange(naxis3),0)[0] * vunit
+    cd3 = vwcs.wcs.cdelt[vwcs.wcs.spec] * vunit
 
     if add_with_kernel:
         if wcs.wcs.has_cd():
@@ -389,7 +396,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
             cd = np.abs(wcs.wcs.cdelt[1])
 
     if velocityrange is not None:
-        v1,v4 = velocityrange
+        v1,v4 = velocityrange * default_unit
         ind1 = np.argmin(np.abs(np.floor(v1-cubevelo)))
         ind2 = np.argmin(np.abs(np.ceil(v4-cubevelo)))+1
 
@@ -428,6 +435,10 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     for spectrum,pos,velo in zip(data_iterator(data,fsw=fsw),
                                  coord_iterator(data,coordsys_out=coordsys),
                                  velo_iterator(data,linefreq=linefreq)):
+
+        if not hasattr(velo,'unit'):
+            velo = velo * default_unit
+
         glon,glat = pos
         cdelt = velo[1]-velo[0]
         if cdelt < 0:
@@ -452,7 +463,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                 print "At point ",x,y," ...",
             if abs(cdelt) < abs(cd3) and allow_smooth:
                 # need to smooth before interpolating to preserve signal
-                kernwidth = abs(cd3/cdelt/2.35)
+                kernwidth = abs(cd3/cdelt/2.35).decompose().value
                 if kernwidth > 2 and kernwidth < 10:
                     xr = kernwidth*5
                     npx = np.ceil(xr*2 + 1)
@@ -465,9 +476,13 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                 #kernel /= kernel.sum()
                 kernel = Gaussian1DKernel(stddev=kernwidth, x_size=npx)
                 smspec = np.convolve(spectrum,kernel,mode='same')
-                datavect = np.interp(cubevelo,velo,smspec)
+                datavect = np.interp(cubevelo.to(default_unit).value,
+                                     velo.to(default_unit).value,
+                                     smspec)
             else:
-                datavect = np.interp(cubevelo,velo,spectrum)
+                datavect = np.interp(cubevelo.to(default_unit).value,
+                                     velo.to(default_unit).value,
+                                     spectrum)
             OK = (datavect[ind1:ind2] == datavect[ind1:ind2])
 
             if excludefitrange is None:
@@ -475,6 +490,9 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
             else:
                 # Exclude certain regions (e.g., the spectral lines) when computing the noise
                 include = OK.copy()
+
+                if not hasattr(excludefitrange,'unit'):
+                    excludefitrange = excludefitrange * default_unit
 
                 # Convert velocities to indices
                 exclude_inds = [np.argmin(np.abs(np.floor(v-cubevelo))) for v in excludefitrange]
@@ -571,7 +589,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                 pdb.set_trace()
 
     if excludefitrange is not None:
-        # this block redifining "include" is used for diagnostics (optional)
+        # this block redefining "include" is used for diagnostics (optional)
         ind1a = np.argmin(np.abs(np.floor(v1-velo)))
         ind2a = np.argmin(np.abs(np.ceil(v4-velo)))+1
         dname = 'DATA' if 'DATA' in data.dtype.names else 'SPECTRA'
@@ -695,10 +713,10 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     if excludefitrange is not None:
         v2v3 = ""
         for v2,v3 in zip(excludefitrange[::2],excludefitrange[1::2]):
-            v2v3 += "%0.2f %0.2f " % (v2,v3)
-        print >>scriptfile,('mfittrend %s  ranges=\\\"%0.2f %s %0.2f\\\" order=%i axis=3 out=%s' % (outfn.replace(".fits",".sdf"),v1,v2v3,v4,baselineorder,outfn.replace(".fits","_baseline.sdf")))
+            v2v3 += "%0.2f %0.2f " % (v2.to(default_unit).value,v3.to(default_unit).value)
+        print >>scriptfile,('mfittrend %s  ranges=\\\"%0.2f %s %0.2f\\\" order=%i axis=3 out=%s' % (outfn.replace(".fits",".sdf"),v1.to(default_unit).value,v2v3,v4.to(default_unit).value,baselineorder,outfn.replace(".fits","_baseline.sdf")))
     else:
-        print >>scriptfile,('mfittrend %s  ranges=\\\"%0.2f %0.2f\\\" order=%i axis=3 out=%s' % (outfn.replace(".fits",".sdf"),v1,v4,baselineorder,outfn.replace(".fits","_baseline.sdf")))
+        print >>scriptfile,('mfittrend %s  ranges=\\\"%0.2f %0.2f\\\" order=%i axis=3 out=%s' % (outfn.replace(".fits",".sdf"),v1.to(default_unit).value,v4.to(default_unit).value,baselineorder,outfn.replace(".fits","_baseline.sdf")))
     print >>scriptfile,('sub %s %s %s' % (outfn.replace(".fits",".sdf"),outfn.replace(".fits","_baseline.sdf"),outfn.replace(".fits","_sub.sdf")))
     print >>scriptfile,('sqorst %s_sub mode=pixelscale  axis=3 pixscale=%i out=%s_vrebin' % (pre,smoothto,pre))
     print >>scriptfile,('gausmooth %s_vrebin fwhm=1.0 axes=[1,2] out=%s_smooth' % (pre,pre))
