@@ -12,10 +12,10 @@ def load_data_file(filename, extension=1, dataarr=None, filepyfits=None,
     """
 
     if filepyfits is not None:
-        datapyfits = filepyfits[extension].data 
+        datapyfits = filepyfits[extension].data
     else:
         try:
-            print "Treating file as an open FITS HDU",
+            print "Treating file as an open FITS HDU... ",
             datapyfits = filename[extension].data
         except AttributeError:
             print "File is not an HDU.  Reading file from disk using pyfits...",

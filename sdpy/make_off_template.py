@@ -121,7 +121,9 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
         
     """
 
-    data, dataarr, namelist, filepyfits = load_data_file(fitsfile, extension=extension, dataarr=dataarr)
+    data, dataarr, namelist, filepyfits = load_data_file(fitsfile,
+                                                         extension=extension,
+                                                         dataarr=dataarr)
 
     # deals with possible pyfits bug?
     #if dataarr.sum() == 0 or dataarr[-1,:].sum() == 0:
