@@ -448,7 +448,8 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
             if debug > 2:
                 print "Reversed spectral axis... ",
 
-        if velo.max() < cubevelo.min() or velo.min() > cubevelo.max():
+        if (velo.max() < cubevelo.min().to(defaultunit).value or
+            velo.min() > cubevelo.max().to(defaultunit).value):
             raise ValueError("Data out of range.")
 
         if progressbar:
@@ -774,7 +775,7 @@ try:
             raise IOError("Missing file %s.  This may be caused by a lack of starlink." % (cubename+suffix))
         cubefile[0].header = _fix_ms_kms_header(cubefile[0].header)
         flathead = strip_headers.flatten_header(cubefile[0].header)
-        integrated = cubes.integ(cubefile,vrange,zunits='wcs')[0]
+        integrated = cubes.integ(cubefile,vrange,zunits='wcs',dvmult=True)[0]
         if integrated.shape != cubefile[0].data.shape[1:]:
             raise ValueError("Cube integrated to incorrect size.  Major error.  Badness.")
         flatimg = pyfits.PrimaryHDU(data=integrated,header=flathead)
