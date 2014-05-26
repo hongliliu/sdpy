@@ -448,8 +448,8 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
             if debug > 2:
                 print "Reversed spectral axis... ",
 
-        if (velo.max() < cubevelo.min().to(defaultunit).value or
-            velo.min() > cubevelo.max().to(defaultunit).value):
+        if (velo.max() < cubevelo.min().to(default_unit).value or
+            velo.min() > cubevelo.max().to(default_unit).value):
             raise ValueError("Data out of range.")
 
         if progressbar:
