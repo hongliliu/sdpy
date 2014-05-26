@@ -28,7 +28,7 @@ for fn in [filename]:
                               cubename_lores+".fits",
                               add_with_kernel=True,
                               kernel_fwhm=50./3600.,
-                              nhits=cubename_lores+"_nhits.fits", wcstype='V',
+                              nhits=cubename_lores+"_nhits.fits",
                               diagnostic_plot_name=fullfn.replace('.fits','_data_scrubbed.png'),
                               velocityrange=velocityrange,excludefitrange=[40,75],noisecut=1.0)
                               # more aggressive noisecut
