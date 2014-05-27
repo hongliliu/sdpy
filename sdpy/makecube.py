@@ -747,9 +747,6 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     print >>scriptfile,('sethead %s_smooth.fits RESTFRQ=`gethead RESTFRQ %s.fits`' % (pre,pre))
     scriptfile.close()
 
-    if progressbar:
-        pb.finish()
-
     if chmod:
         os.system("chmod +x "+outpre+"_starlink.sh")
 
