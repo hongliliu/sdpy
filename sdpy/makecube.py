@@ -434,6 +434,8 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
         pb = ProgressBar(maxval=len(data))
         pb.start()
         counter = 0
+    else:
+        progressbar = False
 
     skipped = []
 
