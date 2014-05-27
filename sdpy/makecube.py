@@ -389,6 +389,11 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     cubevelo = vwcs.wcs_pix2world(np.arange(naxis3),0)[0] * vunit
     cd3 = vwcs.wcs.cdelt[vwcs.wcs.spec] * vunit
 
+    if not vunit.is_equivalent(default_unit):
+        raise ValueError("The units of the cube and the velocity axis are "
+                         "possibly not equivalent.  Change default_unit to "
+                         "the appropriate unit (probably {0})".format(vunit))
+
     if add_with_kernel:
         if wcs.wcs.has_cd():
             cd = np.abs(wcs.wcs.cd[1,1])
@@ -448,8 +453,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
             if debug > 2:
                 print "Reversed spectral axis... ",
 
-        if (velo.max() < cubevelo.min().to(default_unit).value or
-            velo.min() > cubevelo.max().to(default_unit).value):
+        if (velo.max() < cubevelo.min() or velo.min() > cubevelo.max()):
             raise ValueError("Data out of range.")
 
         if progressbar:
