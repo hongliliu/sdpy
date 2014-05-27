@@ -16,7 +16,7 @@ except ImportError:
     pass
 import os
 try:
-    from progressbar import ProgressBar
+    from astropy.utils.console import ProgressBar
 except ImportError:
     pass
 
@@ -323,6 +323,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                      coord_iterator=coord_iterator,
                      velo_iterator=velo_iterator, debug=False,
                      progressbar=False, coordsys='galactic',
+                     datalength=None,
                      velocity_offset=0.0, negative_mean_cut=None,
                      add_with_kernel=False, kernel_fwhm=None, fsw=False,
                      kernel_function=Gaussian2DKernel,
@@ -431,9 +432,10 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     #    print "Spectra have CD=%0.2f, cube has CD=%0.2f.  Will smooth & interpolate." % (cdelt,cd3)
 
     if progressbar and 'ProgressBar' in globals():
-        pb = ProgressBar(maxval=len(data))
-        pb.start()
-        counter = 0
+        if datalength is None:
+            pb = ProgressBar(len(data))
+        else:
+            pb = ProgressBar(datalength)
     else:
         progressbar = False
 
@@ -459,8 +461,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
             raise ValueError("Data out of range.")
 
         if progressbar:
-            pb.update(counter)
-            counter+=1
+            pb.update()
 
         velo += velocity_offset
 
