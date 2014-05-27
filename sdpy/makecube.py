@@ -553,7 +553,17 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                     xinds,yinds = (np.mgrid[:kd,:kd]-mid+np.array([np.round(x),np.round(y)])[:,None,None]).astype('int')
                     #kernel2d = np.exp(-((xinds-x)**2+(yinds-y)**2)/(2*(kernel_fwhm/fwhm/cd)**2))
                     kernel2dwidth = (kernel_fwhm/fwhm/cd)
-                    kernel2d = kernel_function(stddev=kernel2dwidth, x_size=kernel_size, y_size=kernel_size).array
+                    try:
+                        # stddev is the first positional argument; we SHOULD be
+                        # able to specify it with a keyword
+                        kernel2d = kernel_function(stddev=kernel2dwidth,
+                                                   x_size=kernel_size,
+                                                   y_size=kernel_size).array
+                    except TypeError:
+                        # but just in case...
+                        kernel2d = kernel_function(kernel2dwidth,
+                                                   x_size=kernel_size,
+                                                   y_size=kernel_size).array
 
                     dim1 = ind2-ind1
                     vect_to_add = np.outer(datavect[ind1:ind2],kernel2d).reshape([dim1,kd,kd])
