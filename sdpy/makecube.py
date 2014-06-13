@@ -19,6 +19,7 @@ try:
     from astropy.utils.console import ProgressBar
 except ImportError:
     pass
+from astropy import log
 
 # define speed of light for later use
 ckms = constants.c.to(u.km/u.s).value
@@ -92,8 +93,8 @@ def make_blank_images(cubeprefix, flatheader='header.txt',
         raise ValueError("Error: attempting to create cube with > 8 gigapixels")
     blankcube = np.zeros(cubeshape)
     blanknhits = np.zeros([naxis2,naxis1])
-    print("Blank image size: ",naxis1,naxis2,naxis3,
-          ".  Blankcube shape: ",blankcube.shape)
+    log.info("".join(("Blank image size: {0},{1},{2}".format(naxis1,naxis2,naxis3),
+                      ".  Blankcube shape: ",str(blankcube.shape))))
     file1 = pyfits.PrimaryHDU(header=header,data=blankcube)
     file1.writeto(cubeprefix+".fits",clobber=clobber)
     file2 = pyfits.PrimaryHDU(header=flathead,data=blanknhits)
@@ -290,7 +291,7 @@ def generate_continuum_map(filename, pixsize=24, **kwargs):
                 image[int(np.round(y)),int(np.round(x))] += datapoint
                 nhits[int(np.round(y)),int(np.round(x))] += 1
             else:
-                print "Skipped a data point at %f,%f in file %s because it's out of the grid" % (x,y,filename)
+                log.info("Skipped a data point at %f,%f in file %s because it's out of the grid" % (x,y,filename))
 
     imav = image/nhits
 
@@ -303,12 +304,12 @@ def generate_continuum_map(filename, pixsize=24, **kwargs):
 
 
 def add_file_to_cube(filename, cubefilename, debug=False, **kwargs):
-    print "Loading file %s" % filename
+    log.info("Loading file %s" % filename)
     data = pyfits.getdata(filename)
     fileheader = pyfits.getheader(filename)
 
     if debug:
-        print "Loaded ",filename,"...",
+        log.debug("Loaded "+filename+"...")
 
     return add_data_to_cube(cubefilename, filename=filename, data=data,
                             fileheader=fileheader, debug=debug, **kwargs)
@@ -346,8 +347,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     #    raise TypeError("Default unit is not a velocity equivalent.")
 
     if type(nhits) is str:
-        if debug > 0:
-            print "Loading nhits from %s" % nhits
+        log.debug("Loading nhits from %s" % nhits)
         nhits = pyfits.getdata(nhits)
     elif type(nhits) is not np.ndarray:
         raise TypeError("nhits must be a .fits file or an ndarray, but it is ",type(nhits))
@@ -364,22 +364,19 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     contimage = np.zeros_like(nhits)
     nhits_once = np.zeros_like(nhits)
 
-    if debug > 0:
-        print "Loading data cube ",cubefilename
+    log.debug("Loading data cube ",cubefilename)
     # rescale image to weight by number of observations
     image = pyfits.getdata(cubefilename)*nhits
-    if debug > 0:
-        print "nhits statistics: mean, std, nzeros, size",nhits.mean(),nhits.std(),np.sum(nhits==0), nhits.size
-        print "Image statistics: mean, std, nzeros, size",image.mean(),image.std(),np.sum(image==0), image.size, np.sum(np.isnan(image))
-        print "nhits shape: ",nhits.shape
+    log.debug("".join(("nhits statistics: mean, std, nzeros, size",str(nhits.mean()),str(nhits.std()),str(np.sum(nhits==0)), str(nhits.size))))
+    log.debug("".join(("Image statistics: mean, std, nzeros, size",str(image.mean()),str(image.std()),str(np.sum(image==0)), str(image.size), str(np.sum(np.isnan(image))))))
+    log.debug("".join(("nhits shape: ",str(nhits.shape))))
     # default is to set empty pixels to NAN; have to set them
     # back to zero
     image[image!=image] = 0.0
     header = pyfits.getheader(cubefilename)
     # debug print "Cube shape: ",image.shape," naxis3: ",header.get('NAXIS3')," nhits shape: ",nhits.shape
 
-    if debug > 0:
-        print "Image statistics: mean, std, nzeros, size",image.mean(),image.std(),np.sum(image==0), image.size
+    log.debug("".join(("Image statistics: mean, std, nzeros, size",str(image.mean()),str(image.std()),str(np.sum(image==0)), str(image.size))))
 
     flathead = pyfits.Header.fromtextfile(flatheader)
     naxis3 = image.shape[0]
@@ -454,8 +451,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
             # for interpolation, require increasing X axis
             spectrum = spectrum[::-1]
             velo = velo[::-1]
-            if debug > 2:
-                print "Reversed spectral axis... ",
+            log.debug("Reversed spectral axis... ")
 
         if (velo.max() < cubevelo.min() or velo.min() > cubevelo.max()):
             raise ValueError("Data out of range.")
@@ -468,7 +464,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
         if glon != 0 and glat != 0:
             x,y = wcs.wcs_world2pix(glon,glat,0)
             if debug > 2:
-                print "At point ",x,y," ...",
+                logging.debug("".join(("At point ",str(x),str(y)," ...",)))
             if abs(cdelt) < abs(cd3) and allow_smooth:
                 # need to smooth before interpolating to preserve signal
                 kernwidth = abs(cd3/cdelt/2.35).decompose().value
@@ -517,23 +513,23 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
             contestimate = datavect[ind1:ind2][include].mean()
 
             if noiseestimate > noisecut:
-                print "Skipped a data point at %f,%f in file %s because it had excessive noise %f" % (x,y,filename,noiseestimate)
+                log.info("Skipped a data point at %f,%f in file %s because it had excessive noise %f" % (x,y,filename,noiseestimate))
                 skipped.append(True)
                 continue
             elif negative_mean_cut is not None and contestimate < negative_mean_cut:
-                print "Skipped a data point at %f,%f in file %s because it had negative continuum %f" % (x,y,filename,contestimate)
+                log.info("Skipped a data point at %f,%f in file %s because it had negative continuum %f" % (x,y,filename,contestimate))
                 skipped.append(True)
                 continue
             elif OK.sum() == 0:
-                print "Skipped a data point at %f,%f in file %s because it had NANs" % (x,y,filename)
+                log.info("Skipped a data point at %f,%f in file %s because it had NANs" % (x,y,filename))
                 skipped.append(True)
                 continue
             elif OK.sum()/float(abs(ind2-ind1)) < 0.5:
-                print "Skipped a data point at %f,%f in file %s because it had %i NANs" % (x,y,filename,np.isnan(datavect[ind1:ind2]).sum())
+                log.info("Skipped a data point at %f,%f in file %s because it had %i NANs" % (x,y,filename,np.isnan(datavect[ind1:ind2]).sum()))
                 skipped.append(True)
                 continue
             if debug > 2:
-                print "did not skip...",
+                log.debug("did not skip...")
 
             if varweight:
                 weight = 1./noiseestimate**2
@@ -595,16 +591,16 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                     nhits_once[int(np.round(y)),int(np.round(x))] += weight
 
                 if debug > 2:
-                    print "Z-axis indices are ",ind1,ind2,"...",
-                    print "Added a data point at ",int(np.round(x)),int(np.round(y)),"!"
+                    log.debug("Z-axis indices are %i,%i..." % (ind1,ind2,))
+                    log.debug("Added a data point at %i,%i!" % (int(np.round(x)),int(np.round(y))))
                 skipped.append(False)
             else:
                 skipped.append(True)
-                print "Skipped a data point at x,y=%f,%f lon,lat=%f,%f in file %s because it's out of the grid" % (x,y,glon,glat,filename)
+                log.info("Skipped a data point at x,y=%f,%f lon,lat=%f,%f in file %s because it's out of the grid" % (x,y,glon,glat,filename))
 
             if debug_breakpoint:
-                import pdb
-                pdb.set_trace()
+                import ipdb
+                ipdb.set_trace()
 
     if excludefitrange is not None:
         # this block redefining "include" is used for diagnostics (optional)
@@ -650,18 +646,18 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
         dpn_flagged = dpn_pre+"_flagged"+dpn_suf
         pylab.savefig(dpn_flagged, bbox_inches='tight')
 
-        print "Saved diagnostic plot ",diagnostic_plot_name," and ",dpn_flagged
+        log.info("Saved diagnostic plot %s and %s" % (diagnostic_plot_name,dpn_flagged))
 
     if debug > 0:
-        print "nhits statistics: mean, std, nzeros, size",nhits.mean(),nhits.std(),np.sum(nhits==0), nhits.size
-        print "Image statistics: mean, std, nzeros, size",image.mean(),image.std(),np.sum(image==0), image.size
+        log.debug("nhits statistics: mean, std, nzeros, size {0} {1} {2} {3}".format(nhits.mean(),nhits.std(),np.sum(nhits==0), nhits.size))
+        log.debug("Image statistics: mean, std, nzeros, size {0} {1} {2} {3}".format(image.mean(),image.std(),np.sum(image==0), image.size))
     
     imav = image/nhits
 
     if debug > 0:
         nnan = np.sum(np.isnan(imav))
-        print "imav statistics: mean, std, nzeros, size, nnan, ngood:",imav.mean(),imav.std(),np.sum(imav==0), imav.size, nnan, imav.size-nnan
-        print "imav shape: ",imav.shape
+        log.debug("imav statistics: mean, std, nzeros, size, nnan, ngood: {0} {1} {2} {3} {4} {5}".format(imav.mean(),imav.std(),np.sum(imav==0), imav.size, nnan, imav.size-nnan))
+        log.debug("imav shape: {0}".format(imav.shape))
 
     subcube = imav[ind1:ind2,:,:]
 
