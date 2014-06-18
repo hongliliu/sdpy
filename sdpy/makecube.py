@@ -779,7 +779,8 @@ try:
     from pyspeckit import cubes
     from FITS_tools import strip_headers
 
-    def make_flats(cubename,vrange=[0,10],noisevrange=[-100,-50],suffix='_sub.fits'):
+    def make_flats(cubename,vrange=[0,10],noisevrange=[-100,-50],suffix='_sub.fits',
+                   out_suffix=""):
         cubefile = pyfits.open(cubename+suffix)
         if not os.path.exists(cubename+suffix):
             raise IOError("Missing file %s.  This may be caused by a lack of starlink." % (cubename+suffix))
@@ -789,13 +790,16 @@ try:
         if integrated.shape != cubefile[0].data.shape[1:]:
             raise ValueError("Cube integrated to incorrect size.  Major error.  Badness.")
         flatimg = pyfits.PrimaryHDU(data=integrated,header=flathead)
-        flatimg.writeto(cubename.replace("cube","integrated")+".fits",clobber=True)
+        flatimg.writeto(cubename.replace("cube","integrated")+out_suffix+".fits",
+                        clobber=True)
         noise = cubes.integ(cubefile,noisevrange,average=np.std,zunits='wcs')[0]
         flatimg.data = noise
-        flatimg.writeto(cubename.replace("cube","noise")+".fits",clobber=True)
+        flatimg.writeto(cubename.replace("cube","noise")+out_suffix+".fits",
+                        clobber=True)
         mincube = cubes.integ(cubefile,vrange,average=np.min,zunits='wcs')[0]
         flatimg.data = mincube
-        flatimg.writeto(cubename.replace("cube","min")+".fits",clobber=True)
+        flatimg.writeto(cubename.replace("cube","min")+out_suffix+".fits",
+                        clobber=True)
 
 
 except:
