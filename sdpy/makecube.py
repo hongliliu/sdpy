@@ -715,6 +715,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
         HDU2.writeto(continuum_prefix+"_nhits.fits",clobber=True,output_verify='fix')
 
     scriptfile = open(outpre+"_starlink.sh",'w')
+    log.info("Wrote script file {0}".format(outpre+"_starlink.sh"))
     outpath,outfn = os.path.split(cubefilename)
     outpath,pre = os.path.split(outpre)
     print >>scriptfile,("#!/bin/bash")
