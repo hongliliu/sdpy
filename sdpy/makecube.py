@@ -15,6 +15,7 @@ try:
 except ImportError:
     pass
 import os
+import subprocess
 try:
     from astropy.utils.console import ProgressBar
 except ImportError:
