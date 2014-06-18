@@ -44,7 +44,10 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
         # VELREF  =                  259 /1 LSR, 2 HEL, 3 OBS, +256 Radio
         # COMMENT casacore non-standard usage: 4 LSD, 5 GEO, 6 SOU, 7 GAL
     if restfreq:
-        header.update('RESTFRQ',restfreq)
+        try:
+            header.update('RESTFRQ',restfreq.to(u.Hz).value)
+        except AttributeError:
+            header.update('RESTFRQ',restfreq)
     if coordsys == 'galactic':
         header.update('CTYPE1','GLON-CAR')
         header.update('CTYPE2','GLAT-CAR')
