@@ -717,8 +717,8 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
         HDU2.data = nhits_once
         HDU2.writeto(continuum_prefix+"_nhits.fits",clobber=True,output_verify='fix')
 
+    log.info("Writing script file {0}".format(outpre+"_starlink.sh"))
     scriptfile = open(outpre+"_starlink.sh",'w')
-    log.info("Wrote script file {0}".format(outpre+"_starlink.sh"))
     outpath,outfn = os.path.split(cubefilename)
     outpath,pre = os.path.split(outpre)
     print >>scriptfile,("#!/bin/bash")
@@ -748,18 +748,21 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     scriptfile.close()
 
     if chmod:
-        os.system("chmod +x "+outpre+"_starlink.sh")
+        scriptfilename = (outpre+"_starlink.sh").replace(" ","")
+        subprocess.call("chmod +x {0}".format(scriptfilename), shell=True)
 
-    if do_runscript: runscript(outpre)
+    if do_runscript:
+        runscript(outpre)
 
     _fix_ms_kms_file(outpre+"_sub.fits")
     _fix_ms_kms_file(outpre+"_smooth.fits")
 
 def runscript(outpre):
-    if outpre[0] != "/":
-        os.system("./"+outpre+"_starlink.sh")
+    scriptfilename = (outpre+"_starlink.sh").replace(" ","")
+    if scriptfilename[0] != "/":
+        return subprocess.call("./"+scriptfilename, shell=True)
     else:
-        os.system(outpre+"_starlink.sh")
+        return subprocess.call(scriptfilename, shell=True)
 
 def _fix_ms_kms_header(header):
     if header['CUNIT3'] == 'm/s':
