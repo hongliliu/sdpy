@@ -33,47 +33,47 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
                     crpix3=None, clobber=False, bunit="K", restfreq=None,
                     radio=True):
     header = pyfits.Header()
-    header.update('NAXIS1',naxis1)
-    header.update('NAXIS2',naxis2)
-    header.update('NAXIS3',naxis3)
-    header.update('CDELT1',-1*pixsize/3600.0)
-    header.update('CDELT2',pixsize/3600.0)
-    header.update('EQUINOX',2000.0)
-    header.update('SPECSYS','LSRK')
+    header.set('NAXIS1',naxis1)
+    header.set('NAXIS2',naxis2)
+    header.set('NAXIS3',naxis3)
+    header.set('CDELT1',-1*pixsize/3600.0)
+    header.set('CDELT2',pixsize/3600.0)
+    header.set('EQUINOX',2000.0)
+    header.set('SPECSYS','LSRK')
     if radio:
-        header.update('VELREF',257) # CASA convention:
+        header.set('VELREF',257) # CASA convention:
         # VELREF  =                  259 /1 LSR, 2 HEL, 3 OBS, +256 Radio
         # COMMENT casacore non-standard usage: 4 LSD, 5 GEO, 6 SOU, 7 GAL
     if restfreq:
         try:
-            header.update('RESTFRQ',restfreq.to(u.Hz).value)
+            header.set('RESTFRQ',restfreq.to(u.Hz).value)
         except AttributeError:
-            header.update('RESTFRQ',restfreq)
+            header.set('RESTFRQ',restfreq)
     if coordsys == 'galactic':
-        header.update('CTYPE1','GLON-CAR')
-        header.update('CTYPE2','GLAT-CAR')
-        header.update('CRVAL1',centerx)
-        header.update('CRVAL2',0)
-        header.update('CRPIX1',naxis1/2)
-        header.update('CRPIX2',naxis2/2-centery/header['CDELT2'])
+        header.set('CTYPE1','GLON-CAR')
+        header.set('CTYPE2','GLAT-CAR')
+        header.set('CRVAL1',centerx)
+        header.set('CRVAL2',0)
+        header.set('CRPIX1',(naxis1+1.)/2)
+        header.set('CRPIX2',(naxis2+1.)/2-centery/header['CDELT2'])
     if coordsys in ('celestial','radec'):
-        header.update('CTYPE1','RA---TAN')
-        header.update('CTYPE2','DEC--TAN')
-        header.update('CRPIX1',naxis1/2-1)
-        header.update('CRPIX2',naxis2/2-1)
-        header.update('CRVAL1',centerx)
-        header.update('CRVAL2',centery)
-    header.update('BMAJ',bmaj)
-    header.update('BMIN',bmin)
+        header.set('CTYPE1','RA---TAN')
+        header.set('CTYPE2','DEC--TAN')
+        header.set('CRPIX1',(naxis1+1.)/2)
+        header.set('CRPIX2',(naxis2+1.)/2)
+        header.set('CRVAL1',centerx)
+        header.set('CRVAL2',centery)
+    header.set('BMAJ',bmaj)
+    header.set('BMIN',bmin)
     if crpix3 is None:
-        header.update('CRPIX3',naxis3/2-1)
+        header.set('CRPIX3',naxis3/2-1)
     else:
-        header.update('CRPIX3',crpix3)
-    header.update('CRVAL3',crval3)
-    header.update('CDELT3',cd3)
-    header.update('CTYPE3',ctype3)
-    header.update('CUNIT3',cunit3)
-    header.update('BUNIT',bunit)
+        header.set('CRPIX3',crpix3)
+    header.set('CRVAL3',crval3)
+    header.set('CDELT3',cd3)
+    header.set('CTYPE3',ctype3)
+    header.set('CUNIT3',cunit3)
+    header.set('BUNIT',bunit)
     header.totextfile(output_cubeheader,clobber=clobber)
     del header['NAXIS3']
     del header['CRPIX3']
@@ -89,9 +89,9 @@ def make_blank_images(cubeprefix, flatheader='header.txt',
 
     flathead = pyfits.Header.fromtextfile(flatheader)
     header = pyfits.Header.fromtextfile(cubeheader)
-    naxis1,naxis2,naxis3 = (header.get('NAXIS1'),
-                            header.get('NAXIS2'),
-                            header.get('NAXIS3'))
+    naxis1,naxis2,naxis3 = (int(np.ceil(header.get('NAXIS1'))),
+                            int(np.ceil(header.get('NAXIS2'))),
+                            int(np.ceil(header.get('NAXIS3'))))
     cubeshape = [naxis3,naxis2,naxis1]
     if np.product(cubeshape) > 2048**3:
         raise ValueError("Error: attempting to create cube with > 8 gigapixels")
@@ -417,7 +417,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
         # print "Updating CRPIX3 from %i to %i. Cropping to indices %i,%i" % (header.get('CRPIX3'),header.get('CRPIX3')-ind1,ind1,ind2)
         # I think this could be disastrous: cubevelo is already set, but now we're changing how it's set in the header!
         # I don't think there's any reason to have this in the first place
-        # header.update('CRPIX3',header.get('CRPIX3')-ind1)
+        # header.set('CRPIX3',header.get('CRPIX3')-ind1)
 
         # reset v1,v4 to the points we just selected
         v1 = cubevelo[ind1]
@@ -674,12 +674,12 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     if fileheader is not None:
         for k,v in fileheader.iteritems():
             if 'RESTFRQ' in k or 'RESTFREQ' in k:
-                header.update(k,v)
+                header.set(k,v)
             #if k[0] == 'C' and '1' in k and k[-1] != '1':
-            #    header.update(k.replace('1','3'), v)
+            #    header.set(k.replace('1','3'), v)
     header.fromtextfile(cubeheader)
     for k,v in H.iteritems():
-        header.update(k,v)
+        header.set(k,v)
     HDU = pyfits.PrimaryHDU(data=subcube,header=header)
     HDU.writeto(cubefilename,clobber=True,output_verify='fix')
 
