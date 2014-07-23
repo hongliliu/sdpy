@@ -91,8 +91,8 @@ def get_header(header):
     it's already a header
     """
     if isinstance(header, str):
-        return pyfits.Header.fromtextfile(flatheader)
-    elif isinstance(flatheader, pyfits.Header):
+        return pyfits.Header.fromtextfile(header)
+    elif isinstance(header, pyfits.Header):
         return header
     else:
         raise ValueError("Header is not of a valid type.")
