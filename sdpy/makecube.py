@@ -75,6 +75,7 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
     header.set('CUNIT3',cunit3)
     header.set('BUNIT',bunit)
     header.totextfile(output_cubeheader,clobber=clobber)
+    cubeheader = header.copy()
     del header['NAXIS3']
     del header['CRPIX3']
     del header['CRVAL3']
@@ -82,13 +83,23 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
     del header['CTYPE3']
     del header['CUNIT3']
     header.totextfile(output_flatheader,clobber=clobber)
-    return header
+    return cubeheader, header
 
 def make_blank_images(cubeprefix, flatheader='header.txt',
                       cubeheader='cubeheader.txt', clobber=False):
 
-    flathead = pyfits.Header.fromtextfile(flatheader)
-    header = pyfits.Header.fromtextfile(cubeheader)
+    if isinstance(flatheader, str):
+        flathead = pyfits.Header.fromtextfile(flatheader)
+    elif isinstance(flatheader, fits.Header):
+        flathead = flatheader
+    else:
+        raise ValueError("Must give a valid Flat Header")
+    if isinstance(cubeheader, str):
+        header = pyfits.Header.fromtextfile(cubeheader)
+    elif isinstance(cubeheader, fits.Header):
+        header = cubeheader
+    else:
+        raise ValueError("Must give a valid Cube Header")
     naxis1,naxis2,naxis3 = (int(np.ceil(header.get('NAXIS1'))),
                             int(np.ceil(header.get('NAXIS2'))),
                             int(np.ceil(header.get('NAXIS3'))))
