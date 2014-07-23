@@ -90,13 +90,13 @@ def make_blank_images(cubeprefix, flatheader='header.txt',
 
     if isinstance(flatheader, str):
         flathead = pyfits.Header.fromtextfile(flatheader)
-    elif isinstance(flatheader, fits.Header):
+    elif isinstance(flatheader, pyfits.Header):
         flathead = flatheader
     else:
         raise ValueError("Must give a valid Flat Header")
     if isinstance(cubeheader, str):
         header = pyfits.Header.fromtextfile(cubeheader)
-    elif isinstance(cubeheader, fits.Header):
+    elif isinstance(cubeheader, pyfits.Header):
         header = cubeheader
     else:
         raise ValueError("Must give a valid Cube Header")
