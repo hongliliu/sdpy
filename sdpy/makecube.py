@@ -396,7 +396,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
 
     log.debug("".join(("Image statistics: mean, std, nzeros, size",str(image.mean()),str(image.std()),str(np.sum(image==0)), str(image.size))))
 
-    flathead = getheader(flatheader)
+    flathead = get_header(flatheader)
     naxis3 = image.shape[0]
     wcs = pywcs.WCS(flathead)
     cwcs = pywcs.WCS(header)
@@ -691,7 +691,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                 header.set(k,v)
             #if k[0] == 'C' and '1' in k and k[-1] != '1':
             #    header.set(k.replace('1','3'), v)
-    moreH = getheader(cubeheader)
+    moreH = get_header(cubeheader)
     for k,v in H.iteritems():
         header.set(k,v)
     for k,v in moreH.iteritems():
