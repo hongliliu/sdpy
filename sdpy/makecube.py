@@ -85,21 +85,24 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
     header.totextfile(output_flatheader,clobber=clobber)
     return cubeheader, header
 
+def get_header(header):
+    """
+    Get header from a text file if its a string, or just return the header if
+    it's already a header
+    """
+    if isinstance(header, str):
+        return pyfits.Header.fromtextfile(flatheader)
+    elif isinstance(flatheader, pyfits.Header):
+        return header
+    else:
+        raise ValueError("Header is not of a valid type.")
+
 def make_blank_images(cubeprefix, flatheader='header.txt',
                       cubeheader='cubeheader.txt', clobber=False):
 
-    if isinstance(flatheader, str):
-        flathead = pyfits.Header.fromtextfile(flatheader)
-    elif isinstance(flatheader, pyfits.Header):
-        flathead = flatheader
-    else:
-        raise ValueError("Must give a valid Flat Header")
-    if isinstance(cubeheader, str):
-        header = pyfits.Header.fromtextfile(cubeheader)
-    elif isinstance(cubeheader, pyfits.Header):
-        header = cubeheader
-    else:
-        raise ValueError("Must give a valid Cube Header")
+    flathead = get_header(flatheader)
+    header = get_header(cubeheader)
+
     naxis1,naxis2,naxis3 = (int(np.ceil(header.get('NAXIS1'))),
                             int(np.ceil(header.get('NAXIS2'))),
                             int(np.ceil(header.get('NAXIS3'))))
@@ -393,7 +396,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
 
     log.debug("".join(("Image statistics: mean, std, nzeros, size",str(image.mean()),str(image.std()),str(np.sum(image==0)), str(image.size))))
 
-    flathead = pyfits.Header.fromtextfile(flatheader)
+    flathead = getheader(flatheader)
     naxis3 = image.shape[0]
     wcs = pywcs.WCS(flathead)
     cwcs = pywcs.WCS(header)
@@ -688,8 +691,10 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                 header.set(k,v)
             #if k[0] == 'C' and '1' in k and k[-1] != '1':
             #    header.set(k.replace('1','3'), v)
-    header.fromtextfile(cubeheader)
+    moreH = getheader(cubeheader)
     for k,v in H.iteritems():
+        header.set(k,v)
+    for k,v in moreH.iteritems():
         header.set(k,v)
     HDU = pyfits.PrimaryHDU(data=subcube,header=header)
     HDU.writeto(cubefilename,clobber=True,output_verify='fix')
