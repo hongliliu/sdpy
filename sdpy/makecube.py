@@ -21,6 +21,7 @@ try:
 except ImportError:
     pass
 from astropy import log
+from .version import version
 
 # define speed of light for later use
 ckms = constants.c.to(u.km/u.s).value
@@ -31,7 +32,7 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
                     output_flatheader='header.txt',
                     output_cubeheader='cubeheader.txt', cd3=1.0, crval3=0.0,
                     crpix3=None, clobber=False, bunit="K", restfreq=None,
-                    radio=True):
+                    radio=True, author=None):
     header = pyfits.Header()
     header.set('NAXIS1',naxis1)
     header.set('NAXIS2',naxis2)
@@ -74,6 +75,10 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
     header.set('CTYPE3',ctype3)
     header.set('CUNIT3',cunit3)
     header.set('BUNIT',bunit)
+    header.set('SDPYVERS',(version,"sdpy code version"))
+    header.set('ORIGIN','sdpy')
+    if author is not None:
+        header.set('AUTHOR',author)
     header.totextfile(output_cubeheader,clobber=clobber)
     cubeheader = header.copy()
     del header['NAXIS3']
