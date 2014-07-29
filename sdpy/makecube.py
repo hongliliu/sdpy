@@ -78,7 +78,7 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
 
     # Don't do this at install-time
     from .version import version
-    header.set('SDPYVERS',(version,"sdpy code version"))
+    header['SDPYVERS'] = (version,"sdpy code version")
 
     header.set('ORIGIN','sdpy')
     if author is not None:
