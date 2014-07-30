@@ -631,7 +631,9 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
 
         if log.level <= 10:
             dt = time.time() - t1
-            log.debug("Completed x,y={x:4.0f},{y:4.0f} ({x:6.2f},{y:6.2f}) in {dt:<5.1f}s".format(x=x,y=y,dt=dt))
+            log.debug("Completed x,y={x:4.0f},{y:4.0f} ({x:6.2f},{y:6.2f}) in {dt:5.1f}s".format(x=float(x),
+                                                                                                 y=float(y),
+                                                                                                 dt=dt))
 
     if excludefitrange is not None:
         # this block redefining "include" is used for diagnostics (optional)
