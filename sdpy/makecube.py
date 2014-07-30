@@ -487,7 +487,8 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
             # for interpolation, require increasing X axis
             spectrum = spectrum[::-1]
             velo = velo[::-1]
-            log.debug("Reversed spectral axis... ")
+            if log.level < 5:
+                log.debug("Reversed spectral axis... ")
 
         if (velo.max() < cubevelo.min() or velo.min() > cubevelo.max()):
             raise ValueError("Data out of range.")
@@ -631,7 +632,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
 
         if log.level <= 10:
             dt = time.time() - t1
-            log.debug("Completed x,y={x:4.0f},{y:4.0f} ({x:6.2f},{y:6.2f}) in {dt:5.1f}s".format(x=float(x),
+            log.debug("Completed x,y={x:4.0f},{y:4.0f} ({x:6.2f},{y:6.2f}) in {dt:6.2g}s".format(x=float(x),
                                                                                                  y=float(y),
                                                                                                  dt=dt))
 
