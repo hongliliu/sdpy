@@ -22,6 +22,7 @@ try:
 except ImportError:
     pass
 from astropy import log
+import time
 
 # define speed of light for later use
 ckms = constants.c.to(u.km/u.s).value
@@ -392,6 +393,8 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     nhits_once = np.zeros_like(nhits)
 
     log.debug("Loading data cube ",cubefilename)
+    if log.level <= 20:
+        t0 = time.time()
     # rescale image to weight by number of observations
     image = pyfits.getdata(cubefilename)*nhits
     log.debug("".join(("nhits statistics: mean, std, nzeros, size",str(nhits.mean()),str(nhits.std()),str(np.sum(nhits==0)), str(nhits.size))))
@@ -622,7 +625,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
 
                 if log.level < 10:
                     log.debug("Z-axis indices are %i,%i..." % (ind1,ind2,))
-                    log.debug("Added a data point at %i,%i!" % (int(np.round(x)),int(np.round(y))))
+                    log.debug("Added a data point at %i,%i" % (int(np.round(x)),int(np.round(y))))
                 skipped.append(False)
             else:
                 skipped.append(True)
@@ -791,6 +794,9 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
 
     _fix_ms_kms_file(outpre+"_sub.fits")
     _fix_ms_kms_file(outpre+"_smooth.fits")
+
+    if log.level <= 20:
+        log.info("Completed {0} in {1}s".format(pre, time.time()-t0))
 
 def runscript(outpre):
     scriptfilename = (outpre+"_starlink.sh").replace(" ","")
