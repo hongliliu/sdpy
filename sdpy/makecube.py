@@ -581,19 +581,10 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                         raise ValueError("Huge kernel - are you sure?")
                     kernel_middle = mid = (kd-1)/2.
                     xinds,yinds = (np.mgrid[:kd,:kd]-mid+np.array([np.round(x),np.round(y)])[:,None,None]).astype('int')
-                    #kernel2d = np.exp(-((xinds-x)**2+(yinds-y)**2)/(2*(kernel_fwhm/fwhm/cd)**2))
-                    kernel2dwidth = (kernel_fwhm/fwhm/cd)
-                    try:
-                        # stddev is the first positional argument; we SHOULD be
-                        # able to specify it with a keyword
-                        kernel2d = kernel_function(stddev=kernel2dwidth,
-                                                   x_size=kernel_size,
-                                                   y_size=kernel_size).array
-                    except TypeError:
-                        # but just in case...
-                        kernel2d = kernel_function(kernel2dwidth,
-                                                   x_size=kernel_size,
-                                                   y_size=kernel_size).array
+                    # This kernel is NOT centered, and that's the bloody point.
+                    # (I made a very stupid error and used Gaussian2DKernel,
+                    # which is strictly centered, in a previous version)
+                    kernel2d = np.exp(-((xinds-x)**2+(yinds-y)**2)/(2*(kernel_fwhm/fwhm/cd)**2))
 
                     dim1 = ind2-ind1
                     vect_to_add = np.outer(datavect[ind1:ind2],kernel2d).reshape([dim1,kd,kd])
