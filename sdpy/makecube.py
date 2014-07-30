@@ -158,16 +158,14 @@ def data_iterator(data,continuum=False,fsw=False):
 
 def coord_iterator(data,coordsys_out='galactic'):
     if hasattr(data,'GLON') and hasattr(data,'GLAT'):
-        for ii in xrange(data.GLON.shape[0]):
-            if coordsys_out == 'galactic':
-                yield data.GLON[ii],data.GLAT[ii]
-            elif coordsys_out in ('celestial','radec'):
-                pos = coordinates.SkyCoord(data.GLON[ii],
-                                           data.GLAT[ii],
-                                           unit=('deg','deg'),
-                                           frame='galactic')
-                ra,dec = pos.icrs.ra.deg,pos.icrs.dec.deg
-                yield ra,dec
+        if coordsys_out == 'galactic':
+            lon,lat = data.GLON,data.GLAT
+        elif coordsys_out in ('celestial','radec'):
+            pos = coordinates.SkyCoord(data.GLON,
+                                       data.GLAT,
+                                       unit=('deg','deg'),
+                                       frame='galactic')
+            lon,lat = pos.icrs.ra.deg,pos.icrs.dec.deg
     elif hasattr(data,'CRVAL2') and hasattr(data,'CRVAL3'):
         if 'RA' in data.CTYPE2:
             coordsys_in='celestial'
@@ -175,19 +173,20 @@ def coord_iterator(data,coordsys_out='galactic'):
             coordsys_in='galactic'
         else:
             raise Exception("CRVAL exists, but RA/GLON not in CTYPE")
-        for ii in xrange(data.DATA.shape[0]):
-            if coordsys_out == 'galactic' and coordsys_in == 'celestial':
-                pos = coordinates.SkyCoord(data.CRVAL2[ii],
-                                           data.CRVAL3[ii],
-                                           unit=('deg','deg'),
-                                           frame='ICRS')
-                glon,glat = pos.galactic.l.deg, pos.galactic.b.deg
-                yield glon,glat
-            elif (coordsys_out in ('celestial','radec') or
-                  coordsys_in==coordsys_out):
-                yield data.CRVAL2[ii],data.CRVAL3[ii]
+        if coordsys_out == 'galactic' and coordsys_in == 'celestial':
+            pos = coordinates.SkyCoord(data.CRVAL2,
+                                       data.CRVAL3,
+                                       unit=('deg','deg'),
+                                       frame='ICRS')
+            lon,lat = pos.galactic.l.deg, pos.galactic.b.deg
+        elif (coordsys_out in ('celestial','radec') or
+              coordsys_in==coordsys_out):
+            lon,lat = data.CRVAL2,data.CRVAL3
     else:
         raise Exception("No CRVAL or GLON struct in data.")
+
+    for ii in xrange(len(data)):
+            yield lon[ii],lat[ii]
 
 def velo_iterator(data,linefreq=None,useFreq=True):
     for ii in xrange(data.CRPIX1.shape[0]):
