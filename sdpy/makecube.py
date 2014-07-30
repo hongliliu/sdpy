@@ -15,6 +15,7 @@ try:
 except ImportError:
     pass
 import os
+import stat
 import subprocess
 try:
     from astropy.utils.console import ProgressBar
@@ -775,7 +776,9 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
 
     if chmod:
         scriptfilename = (outpre+"_starlink.sh").replace(" ","")
-        subprocess.call("chmod +x {0}".format(scriptfilename), shell=True)
+        #subprocess.call("chmod +x {0}".format(scriptfilename), shell=True)
+        st = os.stat(scriptfilename)
+        os.chmod(scriptfilename, st.st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH | stat.S_IXUSR)
 
     if do_runscript:
         runscript(outpre)
