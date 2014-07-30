@@ -162,9 +162,10 @@ def coord_iterator(data,coordsys_out='galactic'):
             if coordsys_out == 'galactic':
                 yield data.GLON[ii],data.GLAT[ii]
             elif coordsys_out in ('celestial','radec'):
-                pos = coordinates.Galactic(data.GLON[ii],
+                pos = coordinates.SkyCoord(data.GLON[ii],
                                            data.GLAT[ii],
-                                           unit=('deg','deg'))
+                                           unit=('deg','deg'),
+                                           frame='galactic')
                 ra,dec = pos.icrs.ra.deg,pos.icrs.dec.deg
                 yield ra,dec
     elif hasattr(data,'CRVAL2') and hasattr(data,'CRVAL3'):
@@ -176,9 +177,10 @@ def coord_iterator(data,coordsys_out='galactic'):
             raise Exception("CRVAL exists, but RA/GLON not in CTYPE")
         for ii in xrange(data.DATA.shape[0]):
             if coordsys_out == 'galactic' and coordsys_in == 'celestial':
-                pos = coordinates.ICRS(data.CRVAL2[ii],
-                                       data.CRVAL3[ii],
-                                       unit=('deg','deg'))
+                pos = coordinates.SkyCoord(data.CRVAL2[ii],
+                                           data.CRVAL3[ii],
+                                           unit=('deg','deg'),
+                                           frame='ICRS')
                 glon,glat = pos.galactic.l.deg, pos.galactic.b.deg
                 yield glon,glat
             elif (coordsys_out in ('celestial','radec') or
@@ -277,8 +279,8 @@ def generate_continuum_map(filename, pixsize=24, **kwargs):
         miny,maxy = data.CRVAL3.min(),data.CRVAL3.max()
         if 'RA' in data.CTYPE2:
             #coordsys_in='celestial'
-            cmin = coordinates.ICRS(minx, miny, unit='deg,deg')
-            cmax = coordinates.ICRS(maxy, maxy, unit='deg,deg')
+            cmin = coordinates.SkyCoord(minx, miny, unit='deg,deg', frame='ICRS')
+            cmax = coordinates.SkyCoord(maxy, maxy, unit='deg,deg', frame='ICRS')
             minx,miny = cmin.galactic.l.degree, cmin.galactic.b.degree
             maxx,maxy = cmax.galactic.l.degree, cmax.galactic.b.degree
             #minx,miny = coords.Position([minx,miny],system='celestial').galactic()
@@ -424,6 +426,8 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
             cd = np.abs(wcs.wcs.cd[1,1])
         else:
             cd = np.abs(wcs.wcs.cdelt[1])
+        # Alternative implementation; may not work for .cd?
+        #cd = np.abs(np.prod((wcs.wcs.get_cdelt() * wcs.wcs.get_pc().diagonal())))**0.5
 
     if velocityrange is not None:
         v1,v4 = velocityrange * default_unit
@@ -771,6 +775,11 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     print >>scriptfile,('ndf2fits %s_smooth %s_smooth.fits' % (pre,pre))
     print >>scriptfile,("# Fix STARLINK's failure to respect header keywords.")
     print >>scriptfile,('sethead %s_smooth.fits RESTFRQ=`gethead RESTFRQ %s.fits`' % (pre,pre))
+    print >>scriptfile,('rm %s_baseline.sdf' % (pre))
+    print >>scriptfile,('rm %s_smooth.sdf' % (pre))
+    print >>scriptfile,('rm %s_sub.sdf' % (pre))
+    print >>scriptfile,('rm %s_vrebin.sdf' % (pre))
+    print >>scriptfile,('rm %s.sdf' % (pre))
     scriptfile.close()
 
     if chmod:
