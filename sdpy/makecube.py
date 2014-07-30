@@ -332,16 +332,15 @@ def generate_continuum_map(filename, pixsize=24, **kwargs):
     HDU2.writeto(outpre+"_nhits.fits",clobber=True)
 
 
-def add_file_to_cube(filename, cubefilename, debug=False, **kwargs):
+def add_file_to_cube(filename, cubefilename, **kwargs):
     log.info("Loading file %s" % filename)
     data = pyfits.getdata(filename)
     fileheader = pyfits.getheader(filename)
 
-    if debug:
-        log.debug("Loaded "+filename+"...")
+    log.debug("Loaded "+filename+"...")
 
     return add_data_to_cube(cubefilename, filename=filename, data=data,
-                            fileheader=fileheader, debug=debug, **kwargs)
+                            fileheader=fileheader, **kwargs)
 
 def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                      flatheader='header.txt',
@@ -351,7 +350,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                      linefreq=None, allow_smooth=True,
                      data_iterator=data_iterator,
                      coord_iterator=coord_iterator,
-                     velo_iterator=velo_iterator, debug=False,
+                     velo_iterator=velo_iterator,
                      progressbar=False, coordsys='galactic',
                      datalength=None,
                      velocity_offset=0.0, negative_mean_cut=None,
@@ -459,7 +458,8 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     #if abs(cdelt) < abs(cd3):
     #    print "Spectra have CD=%0.2f, cube has CD=%0.2f.  Will smooth & interpolate." % (cdelt,cd3)
 
-    if progressbar and 'ProgressBar' in globals():
+    # Disable progressbar if debug-logging is enabled (they clash)
+    if progressbar and 'ProgressBar' in globals() and log.level > 10:
         if datalength is None:
             pb = ProgressBar(len(data))
         else:
@@ -487,15 +487,15 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
         if (velo.max() < cubevelo.min() or velo.min() > cubevelo.max()):
             raise ValueError("Data out of range.")
 
-        if progressbar:
+        if progressbar and log.level > 10:
             pb.update()
 
         velo += velocity_offset
 
         if glon != 0 and glat != 0:
             x,y = wcs.wcs_world2pix(glon,glat,0)
-            if debug > 2:
-                logging.debug("".join(("At point ",str(x),str(y)," ...",)))
+            if log.level < 10:
+                log.debug("".join(("At point ",str(x),str(y)," ...",)))
             if abs(cdelt) < abs(cd3) and allow_smooth:
                 # need to smooth before interpolating to preserve signal
                 kernwidth = abs(cd3/cdelt/2.35).decompose().value
@@ -559,7 +559,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                 log.info("Skipped a data point at %f,%f in file %s because it had %i NANs" % (x,y,filename,np.isnan(datavect[ind1:ind2]).sum()))
                 skipped.append(True)
                 continue
-            if debug > 2:
+            if log.level < 10:
                 log.debug("did not skip...")
 
             if varweight:
@@ -621,7 +621,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                     contimage[int(np.round(y)),int(np.round(x))] += contestimate*weight
                     nhits_once[int(np.round(y)),int(np.round(x))] += weight
 
-                if debug > 2:
+                if log.level < 10:
                     log.debug("Z-axis indices are %i,%i..." % (ind1,ind2,))
                     log.debug("Added a data point at %i,%i!" % (int(np.round(x)),int(np.round(y))))
                 skipped.append(False)
@@ -679,20 +679,19 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
 
         log.info("Saved diagnostic plot %s and %s" % (diagnostic_plot_name,dpn_flagged))
 
-    if debug > 0:
-        log.debug("nhits statistics: mean, std, nzeros, size {0} {1} {2} {3}".format(nhits.mean(),nhits.std(),np.sum(nhits==0), nhits.size))
-        log.debug("Image statistics: mean, std, nzeros, size {0} {1} {2} {3}".format(image.mean(),image.std(),np.sum(image==0), image.size))
+    log.debug("nhits statistics: mean, std, nzeros, size {0} {1} {2} {3}".format(nhits.mean(),nhits.std(),np.sum(nhits==0), nhits.size))
+    log.debug("Image statistics: mean, std, nzeros, size {0} {1} {2} {3}".format(image.mean(),image.std(),np.sum(image==0), image.size))
     
     imav = image/nhits
 
-    if debug > 0:
-        nnan = np.sum(np.isnan(imav))
+    if log.level <= 10:
+        nnan = np.count_nonzero(np.isnan(imav))
         log.debug("imav statistics: mean, std, nzeros, size, nnan, ngood: {0} {1} {2} {3} {4} {5}".format(imav.mean(),imav.std(),np.sum(imav==0), imav.size, nnan, imav.size-nnan))
         log.debug("imav shape: {0}".format(imav.shape))
 
     subcube = imav[ind1:ind2,:,:]
 
-    if debug > 0:
+    if log.level <= 10:
         nnan = np.sum(np.isnan(subcube))
         print "subcube statistics: mean, std, nzeros, size, nnan, ngood:",np.nansum(subcube)/subcube.size,np.std(subcube[subcube==subcube]),np.sum(subcube==0), subcube.size, nnan, subcube.size-nnan
         print "subcube shape: ",subcube.shape
