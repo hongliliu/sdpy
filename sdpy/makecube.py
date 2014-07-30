@@ -22,7 +22,6 @@ try:
 except ImportError:
     pass
 from astropy import log
-from .version import version
 
 # define speed of light for later use
 ckms = constants.c.to(u.km/u.s).value
