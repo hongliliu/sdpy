@@ -177,7 +177,7 @@ def coord_iterator(data,coordsys_out='galactic'):
             pos = coordinates.SkyCoord(data.CRVAL2,
                                        data.CRVAL3,
                                        unit=('deg','deg'),
-                                       frame='ICRS')
+                                       frame='icrs')
             lon,lat = pos.galactic.l.deg, pos.galactic.b.deg
         elif (coordsys_out in ('celestial','radec') or
               coordsys_in==coordsys_out):
@@ -278,8 +278,8 @@ def generate_continuum_map(filename, pixsize=24, **kwargs):
         miny,maxy = data.CRVAL3.min(),data.CRVAL3.max()
         if 'RA' in data.CTYPE2:
             #coordsys_in='celestial'
-            cmin = coordinates.SkyCoord(minx, miny, unit='deg,deg', frame='ICRS')
-            cmax = coordinates.SkyCoord(maxy, maxy, unit='deg,deg', frame='ICRS')
+            cmin = coordinates.SkyCoord(minx, miny, unit='deg,deg', frame='icrs')
+            cmax = coordinates.SkyCoord(maxy, maxy, unit='deg,deg', frame='icrs')
             minx,miny = cmin.galactic.l.degree, cmin.galactic.b.degree
             maxx,maxy = cmax.galactic.l.degree, cmax.galactic.b.degree
             #minx,miny = coords.Position([minx,miny],system='celestial').galactic()
