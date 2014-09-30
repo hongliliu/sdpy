@@ -108,7 +108,8 @@ def get_header(header):
         raise ValueError("Header is not of a valid type.")
 
 def make_blank_images(cubeprefix, flatheader='header.txt',
-                      cubeheader='cubeheader.txt', clobber=False):
+                      cubeheader='cubeheader.txt', clobber=False,
+                      dtype='float32'):
 
     flathead = get_header(flatheader)
     header = get_header(cubeheader)
@@ -119,8 +120,8 @@ def make_blank_images(cubeprefix, flatheader='header.txt',
     cubeshape = [naxis3,naxis2,naxis1]
     if np.product(cubeshape) > 2048**3:
         raise ValueError("Error: attempting to create cube with > 8 gigapixels")
-    blankcube = np.zeros(cubeshape)
-    blanknhits = np.zeros([naxis2,naxis1])
+    blankcube = np.zeros(cubeshape, dtype=dtype)
+    blanknhits = np.zeros([naxis2,naxis1], dtype=dtype)
     log.info("".join(("Blank image size: {0},{1},{2}".format(naxis1,naxis2,naxis3),
                       ".  Blankcube shape: ",str(blankcube.shape))))
     file1 = pyfits.PrimaryHDU(header=header,data=blankcube)
@@ -635,6 +636,8 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
             log.debug("Completed x,y={x:4.0f},{y:4.0f} ({x:6.2f},{y:6.2f}) in {dt:6.2g}s".format(x=float(x),
                                                                                                  y=float(y),
                                                                                                  dt=dt))
+
+    log.info("Completed 'add_data' loop for {0}".format(cubefilename))
 
     if excludefitrange is not None:
         # this block redefining "include" is used for diagnostics (optional)
