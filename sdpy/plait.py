@@ -32,7 +32,7 @@ def plait_cube(cubes, angles, scale):
     if len(cubes) != len(angles):
         raise ValueError("Must provide the same number of images and angles.")
 
-    if any(cubes.shape != cubes[0].shape for im in images):
+    if any(cube.shape != cubes[0].shape for cube in cubes):
         raise ValueError("Images must have the same shape")
 
     outcube = np.zeros_like(cubes[0])
@@ -45,7 +45,7 @@ def plait_cube(cubes, angles, scale):
 
     return outcube
 
-def plait_plane(images, angles, scales):
+def plait_plane(images, angles, scale):
     """
     Combine N images taken at N scan angles by suppressing large angular scales
     along the scan direction in all of them.
