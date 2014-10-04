@@ -1,7 +1,6 @@
 import numpy as np
 from image_registration.tests.registration_testing import make_extended
-
-
+from astropy.utils.console import ProgressBar
 
 def determine_angle(image):
     """
@@ -27,7 +26,22 @@ def determine_angle(image):
 
     return theta
 
-def plait_cube(cubes, angles, scale):
+def plait_cube(cubes, angles, scale, weights=None, nanification='union'):
+    """
+    Merge N data cubes scanned at N angles downweighting a particular scale
+
+    Parameters
+    ----------
+    cubes : list of `~numpy.ndarray`
+        A list of cubes.  They must have identical dimensions, and they must
+        each have 3 dimensions
+    angles : list of float
+        A list of scan angles in degrees. Must have the same length as cubes
+    scale : float
+        Pixel scale...
+    weights : None or list of np.ndarray
+        List of weight arrays
+    """
 
     if len(cubes) != len(angles):
         raise ValueError("Must provide the same number of images and angles.")
@@ -37,15 +51,20 @@ def plait_cube(cubes, angles, scale):
 
     outcube = np.zeros_like(cubes[0])
 
-    for ind in xrange(cubes[0].shape[0]):
+    if weights is None:
+        weights = [None for c in cubes]
+
+    for ind in ProgressBar(xrange(cubes[0].shape[0])):
         outcube[ind, :, :] = plait_plane([c[ind,:,:]
                                           for c in cubes],
                                          angles,
-                                         scale)
+                                         scale,
+                                         weights=weights,
+                                         nanification=nanification)
 
     return outcube
 
-def plait_plane(images, angles, scale):
+def plait_plane(images, angles, scale, weights=None, nanification='union'):
     """
     Combine N images taken at N scan angles by suppressing large angular scales
     along the scan direction in all of them.
@@ -69,13 +88,28 @@ def plait_plane(images, angles, scale):
 
     accum_wt = np.zeros_like(images[0])
     accum_ft = np.zeros_like(images[0], dtype=np.complex)
-    accum_whnan = np.zeros_like(images[0], dtype='bool')
-    for angle, image in zip(angles, images):
-        wt = weighting(image, angle, scale)
+    if nanification == 'intersection':
+        accum_whnan = np.zeros_like(images[0], dtype='bool')
+    elif nanification == 'union':
+        accum_whnan = np.ones_like(images[0], dtype='bool')
+
+    if weights is None:
+        weights = [1 for x in images]
+    else:
+        weights = [1 if w is None else w
+                   for w in weights]
+        for w in weights:
+            assert np.isscalar(w)
+
+    for angle, image, weight in zip(angles, images, weights):
+        wt = weighting(image.shape, angle, scale) * weight
 
         # Suppress NaNs: they become zero
         whnan = ~np.isfinite(image)
-        accum_whnan |= whnan
+        if nanification == 'intersection':
+            accum_whnan |= whnan
+        elif nanification == 'union':
+            accum_whnan &= whnan
 
         if np.count_nonzero(whnan) > 0:
             image[whnan] = 0
@@ -89,17 +123,19 @@ def plait_plane(images, angles, scale):
     final_image[accum_whnan] = np.nan
     return final_image.real
 
-def weighting(image, theta, sigma, min_wt=0.1):
+def weighting(imageshape, theta, sigma, min_wt=0.1):
     """
     Determine the weighting for fourier combination.
     The weight function is a Gaussian with rotation specified
     by theta in degrees from horizontal
     """
-    y,x = np.indices(image.shape)
-    y = y-image.shape[0]/2.
-    x = x-image.shape[1]/2.
+    y,x = np.indices(imageshape)
+    aspect_ratio = imageshape[0]/float(imageshape[1])
+    y = y-imageshape[0]/2.
+    x = x-imageshape[1]/2.
+    theta_ = np.arctan(np.tan(theta/180.*np.pi) * aspect_ratio)*180/np.pi
     #xrot = x * -np.cos(theta/180.*np.pi) + y * np.sin(theta/180.*np.pi)
-    yrot = x * np.sin(theta/180.*np.pi) + y * np.cos(theta/180.*np.pi)
+    yrot = x * np.sin(theta_/180.*np.pi) + y * np.cos(theta_/180.*np.pi)
 
     weight = 1.0 - (1-min_wt)*np.exp(-yrot**2/(2.*sigma**2))
     return weight
