@@ -26,7 +26,7 @@ def determine_angle(image):
 
     return theta
 
-def plait_cube(cubes, angles, scale, weights=None, nanification='union'):
+def plait_cube(cubes, angles, scale, weights=None, nanification='default_good'):
     """
     Merge N data cubes scanned at N angles downweighting a particular scale
 
@@ -41,6 +41,12 @@ def plait_cube(cubes, angles, scale, weights=None, nanification='union'):
         Pixel scale...
     weights : None or list of np.ndarray
         List of weight arrays
+    nanification : 'default_good' or 'default_bad'
+        How to determine which pixels get set to NaN.  If 'default_good',
+        any pixel that is non-nan in any image will be kept: the output image
+        is the union of the good pixels of the input image.  If 'default_bad',
+        any pixel that is nan in any image will be nan in the output image: the
+        output is the intersection of the good pixels in the inputs
     """
 
     if len(cubes) != len(angles):
@@ -64,7 +70,7 @@ def plait_cube(cubes, angles, scale, weights=None, nanification='union'):
 
     return outcube
 
-def plait_plane(images, angles, scale, weights=None, nanification='union'):
+def plait_plane(images, angles, scale, weights=None, nanification='default_good'):
     """
     Combine N images taken at N scan angles by suppressing large angular scales
     along the scan direction in all of them.
@@ -78,6 +84,12 @@ def plait_plane(images, angles, scale, weights=None, nanification='union'):
     scale : float
         The width of the gaussian by which each image will be downweighted in
         the scan direction
+    nanification : 'default_good' or 'default_bad'
+        How to determine which pixels get set to NaN.  If 'default_good',
+        any pixel that is non-nan in any image will be kept: the output image
+        is the union of the good pixels of the input image.  If 'default_bad',
+        any pixel that is nan in any image will be nan in the output image: the
+        output is the intersection of the good pixels in the inputs
     """
 
     if len(images) != len(angles):
@@ -88,10 +100,14 @@ def plait_plane(images, angles, scale, weights=None, nanification='union'):
 
     accum_wt = np.zeros_like(images[0])
     accum_ft = np.zeros_like(images[0], dtype=np.complex)
-    if nanification == 'intersection':
+    if nanification == 'default_bad':
+        # Start off with everything good, then let *anything* turn it bad
         accum_whnan = np.zeros_like(images[0], dtype='bool')
-    elif nanification == 'union':
+    elif nanification == 'default_good':
+        # Start off with everything bad, then let *anything* turn it good
         accum_whnan = np.ones_like(images[0], dtype='bool')
+    else:
+        raise ValueError("nanification must be 'default_good' or 'default_bad'")
 
     if weights is None:
         weights = [1 for x in images]
@@ -106,9 +122,11 @@ def plait_plane(images, angles, scale, weights=None, nanification='union'):
 
         # Suppress NaNs: they become zero
         whnan = ~np.isfinite(image)
-        if nanification == 'intersection':
+        if nanification == 'default_bad':
+            # if already nan, or presently nan, make bad
             accum_whnan |= whnan
-        elif nanification == 'union':
+        elif nanification == 'default_good':
+            # if BOTH are nan, keep them nan, else they're A-O-K
             accum_whnan &= whnan
 
         if np.count_nonzero(whnan) > 0:
@@ -121,7 +139,8 @@ def plait_plane(images, angles, scale, weights=None, nanification='union'):
     final_ft = accum_ft / accum_wt
     final_image = np.fft.ifft2(np.fft.fftshift(final_ft))
     final_image[accum_whnan] = np.nan
-    return final_image.real
+
+    return np.abs(final_image)
 
 def weighting(imageshape, theta, sigma, min_wt=0.1):
     """
@@ -146,7 +165,7 @@ def test(scale=3, size=256, amplitude=1, seed=0):
     real_im = make_extended(size)
     m0 = add_stripe_noise(real_im, amplitude, axis=0)
     m1 = add_stripe_noise(real_im, amplitude, axis=1)
-    rebuilt_im = plait([m0,m1], [0,90], scale)
+    rebuilt_im = plait_plane([m0,m1], [0,90], scale)
     bad = m0+m1
     return real_im, rebuilt_im, bad, [m0,m1]
 
