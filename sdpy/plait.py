@@ -137,10 +137,10 @@ def plait_plane(images, angles, scale, weights=None, nanification='default_good'
         accum_ft += ft
 
     final_ft = accum_ft / accum_wt
-    final_image = np.fft.ifft2(np.fft.fftshift(final_ft))
+    final_image = np.fft.ifft2(np.fft.ifftshift(final_ft))
     final_image[accum_whnan] = np.nan
 
-    return np.abs(final_image)
+    return final_image.real
 
 def weighting(imageshape, theta, sigma, min_wt=0.1):
     """
