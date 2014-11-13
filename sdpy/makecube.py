@@ -361,6 +361,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                      continuum_prefix=None,
                      debug_breakpoint=False,
                      default_unit=u.km/u.s,
+                     weightspec=None,
                      varweight=False):
     """
     Given a .fits file that contains a binary table of spectra (e.g., as
@@ -370,6 +371,9 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     velocity_offset : 0.0
         Amount to add to the velocity vector before adding it to the cube
         (useful for FSW observations)
+    weightspec : np.ndarray
+        A spectrum with the same size as the input arrays but containing the relative
+        weights of the data
     """
 
     #if not default_unit.is_equivalent(u.km/u.s):
@@ -572,7 +576,13 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
             if varweight:
                 weight = 1./noiseestimate**2
             else:
-                weight = 1
+                weight = 1.
+
+            if weightspec is None:
+                wspec = weight
+            else:
+                wspec = weight * weightspec
+
 
             if 0 < int(np.round(x)) < naxis1 and 0 < int(np.round(y)) < naxis2:
                 if add_with_kernel:
@@ -607,7 +617,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                         vect_to_add = vect_to_add[:,xok,:]
                         kernel2d = kernel2d[xok,:]
 
-                    image[ind1:ind2,yinds,xinds] += vect_to_add*weight
+                    image[ind1:ind2,yinds,xinds] += vect_to_add*wspec
                     # NaN spectral bins are not appropriately downweighted... but they shouldn't exist anyway...
                     nhits[yinds,xinds] += kernel2d*weight
                     contimage[yinds,xinds] += kernel2d * contestimate*weight
