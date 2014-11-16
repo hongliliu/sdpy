@@ -398,8 +398,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     nhits_once = np.zeros_like(nhits)
 
     log.debug("Loading data cube ",cubefilename)
-    if log.level <= 20:
-        t0 = time.time()
+    t0 = time.time()
     # rescale image to weight by number of observations
     image = pyfits.getdata(cubefilename)*nhits
     log.debug("".join(("nhits statistics: mean, std, nzeros, size",str(nhits.mean()),str(nhits.std()),str(np.sum(nhits==0)), str(nhits.size))))
@@ -635,7 +634,9 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                 skipped.append(False)
             else:
                 skipped.append(True)
-                log.info("Skipped a data point at x,y=%f,%f lon,lat=%f,%f in file %s because it's out of the grid" % (x,y,glon,glat,filename))
+                log.info("Skipped a data point at x,y=%f,%f "
+                         "lon,lat=%f,%f in file %s because "
+                         "it's out of the grid" % (x,y,glon,glat,filename))
 
             if debug_breakpoint:
                 import ipdb
@@ -643,11 +644,13 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
 
         if log.level <= 10:
             dt = time.time() - t1
-            log.debug("Completed x,y={x:4.0f},{y:4.0f} ({x:6.2f},{y:6.2f}) in {dt:6.2g}s".format(x=float(x),
-                                                                                                 y=float(y),
-                                                                                                 dt=dt))
+            log.debug("Completed x,y={x:4.0f},{y:4.0f}"
+                      " ({x:6.2f},{y:6.2f}) in {dt:6.2g}s".format(x=float(x),
+                                                                  y=float(y),
+                                                                  dt=dt))
 
-    log.info("Completed 'add_data' loop for {0}".format(cubefilename))
+    log.info("Completed 'add_data' loop for"
+             " {0} in {1}s".format(cubefilename, time.time()-t0))
 
     if excludefitrange is not None:
         # this block redefining "include" is used for diagnostics (optional)
