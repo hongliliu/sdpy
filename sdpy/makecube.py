@@ -361,6 +361,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
                      continuum_prefix=None,
                      debug_breakpoint=False,
                      default_unit=u.km/u.s,
+                     make_continuum=True,
                      weightspec=None,
                      varweight=False):
     """
@@ -752,8 +753,9 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
 
     #OKCube = (imav==imav)
     #contmap = np.nansum(imav[naxis3*0.1:naxis3*0.9,:,:],axis=0) / OKCube.sum(axis=0)
-    contmap = np.nansum(imav[include,:,:],axis=0) / include.sum()
-    HDU2 = pyfits.PrimaryHDU(data=contmap,header=flathead)
+    if make_continuum:
+        contmap = np.nansum(imav[include,:,:],axis=0) / include.sum()
+        HDU2 = pyfits.PrimaryHDU(data=contmap,header=flathead)
     HDU2.writeto(outpre+"_continuum.fits",clobber=True,output_verify='fix')
     HDU2.data = nhits
     HDU2.writeto(outpre+"_nhits.fits",clobber=True,output_verify='fix')
