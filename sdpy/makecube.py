@@ -751,21 +751,22 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
         if include.sum() == 0:
             raise ValueError("All data excluded.")
 
+    HDU2.data = nhits
+    HDU2.writeto(outpre+"_nhits.fits",clobber=True,output_verify='fix')
+
     #OKCube = (imav==imav)
     #contmap = np.nansum(imav[naxis3*0.1:naxis3*0.9,:,:],axis=0) / OKCube.sum(axis=0)
     if make_continuum:
         contmap = np.nansum(imav[include,:,:],axis=0) / include.sum()
         HDU2 = pyfits.PrimaryHDU(data=contmap,header=flathead)
-    HDU2.writeto(outpre+"_continuum.fits",clobber=True,output_verify='fix')
-    HDU2.data = nhits
-    HDU2.writeto(outpre+"_nhits.fits",clobber=True,output_verify='fix')
+        HDU2.writeto(outpre+"_continuum.fits",clobber=True,output_verify='fix')
 
-    if continuum_prefix is not None:
-        # Solo continuum image (just this obs set)
-        HDU2.data = contimage / nhits_once
-        HDU2.writeto(continuum_prefix+"_continuum.fits",clobber=True,output_verify='fix')
-        HDU2.data = nhits_once
-        HDU2.writeto(continuum_prefix+"_nhits.fits",clobber=True,output_verify='fix')
+        if continuum_prefix is not None:
+            # Solo continuum image (just this obs set)
+            HDU2.data = contimage / nhits_once
+            HDU2.writeto(continuum_prefix+"_continuum.fits",clobber=True,output_verify='fix')
+            HDU2.data = nhits_once
+            HDU2.writeto(continuum_prefix+"_nhits.fits",clobber=True,output_verify='fix')
 
     log.info("Writing script file {0}".format(outpre+"_starlink.sh"))
     scriptfile = open(outpre+"_starlink.sh",'w')
