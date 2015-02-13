@@ -751,7 +751,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
         if include.sum() == 0:
             raise ValueError("All data excluded.")
 
-    HDU2.data = nhits
+    HDU2 = pyfits.PrimaryHDU(data=nhits,header=flathead)
     HDU2.writeto(outpre+"_nhits.fits",clobber=True,output_verify='fix')
 
     #OKCube = (imav==imav)
