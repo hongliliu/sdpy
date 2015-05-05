@@ -190,16 +190,18 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
     OK *= np.isfinite(data['DATA'].sum(axis=1))
     OKsource = OK.copy()
     if sourcename is not None:
-        OKsource *= (data['OBJECT'] == sourcename)
+        OKsource &= (data['OBJECT'] == sourcename)
     if scanrange is not []:
-        OKsource *= (scanrange[0] < data['SCAN'])*(data['SCAN'] < scanrange[1])
+        OKsource &= (scanrange[0] < data['SCAN'])*(data['SCAN'] < scanrange[1])
     if obsmode is not None:
-        OKsource *= ((obsmode == data.OBSMODE) + ((obsmode+":NONE:TPWCAL") == data.OBSMODE))
+        OKsource &= ((obsmode == data.OBSMODE) |
+                     ((obsmode+":NONE:TPWCAL") == data.OBSMODE))
     if sourcename is None and scanrange is None:
         raise IndexError("Must specify a source name and/or a scan range")
 
     if verbose:
-        print "Beginning scan selection and calibration for sampler %s and feed %s" % (sampler,feednum)
+        log.info("Beginning scan selection and calibration for "
+                 "sampler %s and feed %s" % (sampler,feednum))
 
     CalOff = (data['CAL']=='F')
     CalOn  = (data['CAL']=='T')

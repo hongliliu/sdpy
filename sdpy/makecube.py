@@ -398,13 +398,13 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     contimage = np.zeros_like(nhits)
     nhits_once = np.zeros_like(nhits)
 
-    log.debug("Loading data cube ",cubefilename)
+    log.debug("Loading data cube {0}".format(cubefilename))
     t0 = time.time()
     # rescale image to weight by number of observations
     image = pyfits.getdata(cubefilename)*nhits
-    log.debug("".join(("nhits statistics: mean, std, nzeros, size",str(nhits.mean()),str(nhits.std()),str(np.sum(nhits==0)), str(nhits.size))))
-    log.debug("".join(("Image statistics: mean, std, nzeros, size",str(image.mean()),str(image.std()),str(np.sum(image==0)), str(image.size), str(np.sum(np.isnan(image))))))
-    log.debug("".join(("nhits shape: ",str(nhits.shape))))
+    log.debug(" ".join(("nhits statistics: mean, std, nzeros, size",str(nhits.mean()),str(nhits.std()),str(np.sum(nhits==0)), str(nhits.size))))
+    log.debug(" ".join(("Image statistics: mean, std, nzeros, size",str(image.mean()),str(image.std()),str(np.sum(image==0)), str(image.size), str(np.sum(np.isnan(image))))))
+    log.debug(" ".join(("nhits shape: ",str(nhits.shape))))
     # default is to set empty pixels to NAN; have to set them
     # back to zero
     image[image!=image] = 0.0

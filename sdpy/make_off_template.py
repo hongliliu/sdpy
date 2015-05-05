@@ -143,22 +143,26 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
 
     nspec = OKsource.sum()
     if nspec == 0:
-        raise ValueError("No matches found for source %s in scan range %i:%i" % (sourcename,scanrange[0],scanrange[1]))
+        raise ValueError("No matches found for source %s in scan range"
+                         " %i:%i" % (sourcename,scanrange[0],scanrange[1]))
 
-    print "Beginning scan selection and calibration for sampler %s and feed %s with %i spectra" % (sampler,feednum,nspec)
+    log.info("Beginning scan selection and calibration for sampler %s"
+             " and feed %s with %i spectra" % (sampler,feednum,nspec))
 
     CalOff = (data['CAL']=='F')
     CalOn  = (data['CAL']=='T')
 
     if CalOff.sum() == 0:
-        raise ValueError("No cal-off found: you're probably working with reduced instead of raw data")
+        raise ValueError("No cal-off found: you're probably working with"
+                         " reduced instead of raw data")
     if CalOn.sum() == 0:
         raise ValueError("No cal-on found")
 
     speclen = dataarr.shape[1]
 
     # compute mean of each spectrum (this is a continuum time-series)
-    # Start by optionally excluding the ends of the spectrum, where signal is usually forced to zero
+    # Start by optionally excluding the ends of the spectrum, where signal is
+    # usually forced to zero
     if exclude_spectral_ends:
         endsslice = slice(speclen*exclude_spectral_ends/100.,
                           -speclen*exclude_spectral_ends/100.)
@@ -196,10 +200,12 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
                                   off_template[OKvelo],
                                   interp_polyorder)
         else:
-            raise ValueError("Polynomial order to be fitted is greater than the number of points to be fitted.")
+            raise ValueError("Polynomial order to be fitted is greater than"
+                             " the number of points to be fitted.")
 
         # replace the "not OK" regions with the interpolated values
-        off_template[nOKvelo] = np.polyval(polypars, np.arange(velo.size)[nOKvelo]).astype(off_template.dtype)
+        off_template[nOKvelo] = np.polyval(polypars,
+                                           np.arange(velo.size)[nOKvelo]).astype(off_template.dtype)
     elif return_poly and interp_vrange:
         polypars = np.polyfit(np.arange(velo.size)[OKvelo],
                               off_template[OKvelo],
@@ -217,7 +223,8 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
     if return_uninterp:
         return_vals = return_vals + (off_template_in,)
     if return_poly:
-        return_vals = return_vals + (np.polyval(polypars, np.arange(velo.size)).astype(off_template.dtype),)
+        return_vals = return_vals + (np.polyval(polypars,
+                                                np.arange(velo.size)).astype(off_template.dtype),)
 
 
     if savefile:
@@ -225,7 +232,8 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
             velo = velo_iterator(data,linefreq=linefreq).next()
         if debug: print 'min,max velo',velo.min(),velo.max()
         header = generate_1d_header_fromdisparray(velo*u.km/u.s,
-                                                  reference=linefreq*u.Hz if linefreq is not None else None)
+                                                  reference=linefreq*u.Hz
+                                                  if linefreq is not None else None)
         outf = fits.PrimaryHDU(data=np.array(return_vals),
                                header=header)
         outf.writeto(savefile+"_offspectra.fits", clobber=clobber)
