@@ -1,6 +1,7 @@
 import astropy.io.fits as pyfits
 import numpy as np
 import warnings
+from astropy import log
 
 from .timer import print_timing
 
@@ -222,7 +223,7 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         raise TypeError("Must specify reference scans as a list of scan numbers.")
 
     if verbose:
-        print "Beginning calibration of %i scans." % ((OKsource*CalOn).sum())
+        log.info("Beginning calibration of %i scans." % ((OKsource*CalOn).sum()))
 
     if ((OKsource*CalOn).sum()) == 0:
         import pdb; pdb.set_trace()
@@ -242,7 +243,7 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
                                                         exslice=exslice,
                                                         airmass_method=airmass_method)
         if verbose:
-            print "EXPERIMENTAL: min_scale_reference = ",ref_scale
+            log.info("EXPERIMENTAL: min_scale_reference = {0}".format(ref_scale))
     
     for specindOn,specindOff in zip(np.where(OKsource*CalOn)[0],
                                     np.where(OKsource*CalOff)[0]):
@@ -288,7 +289,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         # EXPERIMENTAL
         if min_scale_reference:
             if verbose > 2:
-                print "Rescaling specRef from ",specRef[exslice].mean()," to ",ref_scale
+                log.info("Rescaling specRef from {0} to {1}"
+                         .format(specRef[exslice].mean(),ref_scale))
             specRef = specRef/specRef[exslice].mean() * ref_scale
             if scale_airmass:
                 specRef += tatm/ref_cntstoK*(np.exp(-tauz*ref_airmass)-np.exp(-tauz*airmass))
@@ -304,7 +306,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
 
         tsys = data['TSYS'][specindOn]
         
-        # I don't think this is right... the correct way is to make sure specRef moves with Spec
+        # I don't think this is right... the correct way is to make sure
+        # specRef moves with Spec
         #tsys_eff = tsys * np.exp(tau*airmass) - (np.exp(tau*airmass)-1)*tatm
         tsys_eff = tsys * np.exp(tauz*airmass)
 

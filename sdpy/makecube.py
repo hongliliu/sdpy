@@ -176,6 +176,12 @@ def coord_iterator(data,coordsys_out='galactic'):
         else:
             raise Exception("CRVAL exists, but RA/GLON not in CTYPE")
         if coordsys_out == 'galactic' and coordsys_in == 'celestial':
+            #if hasattr(data, 'FEEDXOFF'):
+            #    feedxoff = data.FEEDXOFF
+            #elif hasattr(data, 'BEAMXOFF'):
+            #    feedxoff = data.BEAMXOFF
+            #else:
+            #    feedxoff = 0
             pos = coordinates.SkyCoord(data.CRVAL2,
                                        data.CRVAL3,
                                        unit=('deg','deg'),
@@ -675,6 +681,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
         if include.sum() == 0:
             raise ValueError("All data excluded.")
     else:
+        dname = 'DATA' if 'DATA' in data.dtype.names else 'SPECTRA'
         include = slice(None)
 
 

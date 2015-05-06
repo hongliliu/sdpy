@@ -4,6 +4,7 @@ import numpy as np
 
 from astropy.io import fits
 from astropy import units as u
+from astropy import log
 
 type_to_ctype = {'length':'WAVE',
                  'frequency':'FREQ',
