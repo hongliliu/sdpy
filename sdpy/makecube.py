@@ -34,6 +34,10 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
                     output_cubeheader='cubeheader.txt', cd3=1.0, crval3=0.0,
                     crpix3=None, clobber=False, bunit="K", restfreq=None,
                     radio=True, author=None):
+    """
+    TODO: This should be automatically generated from appropriate data from
+    GBT, APEX, etc.  Manually producing this leads to errors.
+    """
     header = pyfits.Header()
     header.set('NAXIS1',naxis1)
     header.set('NAXIS2',naxis2)
