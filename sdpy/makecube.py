@@ -515,8 +515,11 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
 
         if glon != 0 and glat != 0:
             x,y = wcs.wcs_world2pix(glon,glat,0)
+            if np.isnan(x) or np.isnan(y):
+                log.warn("".join(("Skipping NaN point {0}, {1} ...".format(glon,glat))))
+                continue
             if log.level < 10:
-                log.debug("".join(("At point ",str(x),str(y)," ...",)))
+                log.debug("".join(("At point {0},{1} ...".format(glon,glat),)))
             if abs(cdelt) < abs(cd3) and allow_smooth:
                 # need to smooth before interpolating to preserve signal
                 kernwidth = abs(cd3/cdelt/2.35).decompose().value
