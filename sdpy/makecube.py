@@ -200,7 +200,7 @@ def coord_iterator(data,coordsys_out='galactic'):
     for ii in xrange(len(data)):
             yield lon[ii],lat[ii]
 
-def velo_iterator(data,linefreq=None,useFreq=True):
+def velo_iterator(data,linefreq=None,useFreq=True, subvframe=True):
     for ii in xrange(data.CRPIX1.shape[0]):
         if hasattr(data,'SPECTRA'):
             npix = data.SPECTRA.shape[1]
@@ -234,6 +234,8 @@ def velo_iterator(data,linefreq=None,useFreq=True):
             obsfreq = data.OBSFREQ[ii]
             deltaf = data.CDELT1[ii]
             sourcevel = data.VELOCITY[ii]
+            if data.CTYPE1[ii] == 'FREQ-OBS' and subvframe:
+                vframe = data.VFRAME[ii] / 1e3
             CRPIX = data.CRPIX1[ii]
             if linefreq is not None:
                 # not the right frequency crvalfreq = data.CRVAL1[ii]
@@ -245,7 +247,7 @@ def velo_iterator(data,linefreq=None,useFreq=True):
                 # trying again, since 2-2 clearly offset from 1-1
                 freqarr = (np.arange(npix)+1-CRPIX)*deltaf + obsfreq
                 # RADIO VELOCITY
-                velo = (linefreq-freqarr)/linefreq * ckms
+                velo = (linefreq-freqarr)/linefreq * ckms - vframe
                 #obsfreq = data.OBSFREQ[ii]
                 #cenfreq = obsfreq + (linefreq-restfreq)
                 #crfreq = (CRPIX-1)*deltaf + cenfreq
