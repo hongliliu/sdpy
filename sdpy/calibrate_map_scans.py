@@ -89,7 +89,7 @@ def compute_gains_highfreq(data, feednum=1, sampler=0, tcold=50.):
         gain = (warmload-coldload)/np.median(warm_meas-cold_meas)
         tsys = np.median(gain*sky)
 
-        time = data['DATE-OBS'][data['SCAN'] == scan][0]
+        time = data['LST'][data['SCAN'] == scan][0]
         source = data['OBJECT'][data['SCAN'] == scan][0]
         results[time] = (gain,tsys,source)
 
@@ -655,8 +655,22 @@ def cal_loop_highfreq(data, dataarr, newdatadict, OKsource,  speclen,
             specRef = off_template * specRef[exslice].mean() / off_template[exslice].mean()
 
         tsys = data['TSYS'][specindOn]
-        
-        calSpec = (spec-specRef)*gain
+
+        if isinstance(gain, dict):
+            gaintimes = np.array(gain.keys())
+            gains = np.array([v[0] for v in gain.values()])
+            nearest_gain = np.argmin(np.abs(gaintimes-LSTspec))
+            if (nearest_gain == 0 or (gaintimes[nearest_gain] < LSTspec and
+                                      nearest_gain < len(gaintimes)-1)):
+                prev_gain, next_gain = gains[nearest_gain], gains[nearest_gain+1]
+                prev_lst, next_lst = gaintimes[nearest_gain], gaintimes[nearest_gain+1]
+            elif nearest_gain == len(gaintimes)-1 or gaintimes[nearest_gain] > LSTspec:
+                prev_gain, next_gain = gains[nearest_gain-1], gains[nearest_gain]
+                prev_lst, next_lst = gaintimes[nearest_gain-1], gaintimes[nearest_gain]
+            local_gain = (next_gain-prev_gain)/(next_lst-prev_lst)*(LSTspec-prev_lst) + prev_gain
+            calSpec = (spec-specRef)*local_gain
+        else:
+            calSpec = (spec-specRef)*gain
 
         if calSpec.sum() == 0:
             raise ValueError("All values in calibrated spectrum are zero")
