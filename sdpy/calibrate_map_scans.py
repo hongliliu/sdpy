@@ -2,6 +2,7 @@ import astropy.io.fits as pyfits
 import numpy as np
 import warnings
 from astropy import log
+from astropy.utils.console import ProgressBar
 
 from .timer import print_timing
 
@@ -47,6 +48,54 @@ def load_data_file(filename, extension=1, dataarr=None, filepyfits=None,
 
     return data, dataarr, namelist, filepyfits
 
+def compute_gains_highfreq(data, feednum=1, sampler=0, tcold=50.):
+    """
+    Compute all gains as a function of time for a feed / sampler
+    """
+
+    calseqs = ((data['OBSMODE'] == 'CALSEQ:NONE:TPNOCAL') &
+               (data['FEED'] == feednum) &
+               (data['SAMPLER'] == sampler)
+              )
+
+    if np.count_nonzero(calseqs) == 0:
+        raise ValueError("No matching feeds or observation types for feed {0}"
+                         " and sampler {1}"
+                         .format(feednum, sampler))
+
+    twarm = data['TWARM'][calseqs]
+
+    scans = list(set(data['SCAN'][calseqs]))
+
+    firstscans = [sn for sn in scans
+                  if sn+1 in scans and sn+2 in scans]
+
+    results = {}
+
+    for scan in firstscans:
+        sky = data['DATA'][data['SCAN'] == scan].mean(axis=0)
+        tem1 = data['DATA'][data['SCAN'] == scan+1].mean(axis=0)
+        tem2 = data['DATA'][data['SCAN'] == scan+2].mean(axis=0)
+        if feednum == 2:
+            warm_meas,cold_meas = tem1,tem2
+        elif feednum == 1:
+            warm_meas,cold_meas = tem2,tem1
+        else:
+            raise ValueError("Feed must be 1 or 2")
+
+        warmload = np.median(data['TWARM'][data['SCAN'] == scan])
+        coldload = tcold
+
+        gain = (warmload-coldload)/np.median(warm_meas-cold_meas)
+        tsys = np.median(gain*sky)
+
+        time = data['DATE-OBS'][data['SCAN'] == scan][0]
+        source = data['OBJECT'][data['SCAN'] == scan][0]
+        results[time] = (gain,tsys,source)
+
+    return results
+
+
 @print_timing
 def calibrate_cube_data(filename, outfilename, scanrange=[],
                         sourcename=None, feednum=1, sampler=0,
@@ -63,6 +112,9 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
                         trec=None,
                         airmass_method='maddalena',
                         scale_airmass=True,
+                        tsys=None,
+                        gain=None,
+                        highfreq=False,
                         ):
     """
     The calibration process in pseudocode:
@@ -153,6 +205,16 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
     scale_airmass: bool
         If the min_scale_reference method is used, try to re-scale the off
         position mean by the airmass
+    tsys: None or float
+        Manually specified system temperature.  Defaults to None, which means
+        it will be computed.  This is intended for high-frequency (W-band)
+        observing.
+    gain: None or float
+        Manually specified gain.  Defaults to None.  This is intended for
+        high-frequency (W-band) observing.
+    highfreq : bool
+        Is the data high freqency?  If True, there should be no noise
+        calibrator, so calibration requires gain to be specified.
     """
 
     if tau != 0:
@@ -172,6 +234,9 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
             raise ValueError('refscans does not match refscan1,2')
         elif refscans is None:
             refscans = refscan1,refscan2
+
+    if highfreq:
+        assert gain is not None
 
     data, dataarr, namelist, filepyfits = load_data_file(filename,
                                                          extension=extension,
@@ -196,7 +261,9 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         OKsource &= (scanrange[0] < data['SCAN'])*(data['SCAN'] < scanrange[1])
     if obsmode is not None:
         OKsource &= ((obsmode == data.OBSMODE) |
-                     ((obsmode+":NONE:TPWCAL") == data.OBSMODE))
+                     ((obsmode+":NONE:TPWCAL") == data.OBSMODE) |
+                     ((obsmode+":NONE:TPNOCAL") == data.OBSMODE)
+                    )
     if sourcename is None and scanrange is None:
         raise IndexError("Must specify a source name and/or a scan range")
 
@@ -215,23 +282,34 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
 
     # reference scans define the "background continuum"
     if type(refscans) == list:
-        # split into two steps for readability
-        temp_ref = get_reference(data, refscans, CalOn=CalOn, CalOff=CalOff,
-                                 exslice=exslice, OK=OK)
-        LSTrefs, refarray, ref_cntstoK, tsysref = temp_ref
+        if not highfreq:
+            # split into two steps for readability
+            temp_ref = get_reference(data, refscans, CalOn=CalOn, CalOff=CalOff,
+                                     exslice=exslice, OK=OK)
+            LSTrefs, refarray, ref_cntstoK, tsysref = temp_ref
+        else:
+            LSTrefs, refarray = get_reference_highfreq(data, refscans, OK=OK)
     else:
         raise TypeError("Must specify reference scans as a list of scan numbers.")
 
-    if verbose:
-        log.info("Beginning calibration of %i scans." % ((OKsource*CalOn).sum()))
+    if highfreq:
+        nscansok = np.count_nonzero(OKsource)
+    else:
+        nscansok = np.count_nonzero(OKsource*CalOn)
 
-    if ((OKsource*CalOn).sum()) == 0:
+    if verbose:
+        log.info("Beginning calibration of %i scans." % nscansok)
+
+    if nscansok == 0:
         import pdb; pdb.set_trace()
         raise ValueError("There are no locations where the source was observed"
                          " with the calibration diode on.  That can't be right.")
 
-    compute_tsys(data, tsysmethod=tsysmethod, OKsource=OKsource, CalOn=CalOn,
-                 CalOff=CalOff, exslice=exslice, verbose=verbose)
+    if tsys is None:
+        compute_tsys(data, tsysmethod=tsysmethod, OKsource=OKsource, CalOn=CalOn,
+                     CalOff=CalOff, exslice=exslice, verbose=verbose)
+    else:
+        data['TSYS'] = tsys
 
     # experimental: try to rescale the "reference" scan to be the minimum
     if min_scale_reference:
@@ -245,78 +323,16 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         if verbose:
             log.info("EXPERIMENTAL: min_scale_reference = {0}".format(ref_scale))
     
-    for specindOn,specindOff in zip(np.where(OKsource*CalOn)[0],
-                                    np.where(OKsource*CalOff)[0]):
-
-        for K in namelist:
-            if K != 'DATA':
-                newdatadict[K].append(data[K][specindOn])
-            else:
-                # should this be speclen or 4096?  Changing to speclen...
-                newdatadict['DATA'].append(np.zeros(speclen))
-
-        # http://www.gb.nrao.edu/~rmaddale/Weather/
-        elev = data['ELEVATIO'][specindOn]
-        airmass = elev_to_airmass(elev,
-                                  method=airmass_method)
-
-        specOn = dataarr[specindOn,:]
-        specOff = dataarr[specindOff,:]
-        spec = (specOn + specOff)/2.0
-        LSTspec = data['LST'][specindOn]
-
-        # this "if" test is no longer necessary
-        if refscans is not None:
-            # find the reference scan closest to the current scan
-            # (LSTspec is a number, LSTrefs is an array, probably length 2)
-            refscannumber = np.argmin(np.abs(LSTspec-LSTrefs))
-            # if the closest reference scan is the last or it is after the spectrum...
-            # the earlier reference scan has index self-1
-            if refscannumber == len(refscans) - 1 or LSTrefs[refscannumber] > LSTspec:
-                r1 = refscannumber - 1
-                r2 = refscannumber
-            elif LSTrefs[refscannumber] < LSTspec:
-                r1 = refscannumber
-                r2 = refscannumber + 1
-            LSTref1 = LSTrefs[r1]
-            LSTref2 = LSTrefs[r2]
-            specref1 = refarray[r1,:]
-            specref2 = refarray[r2,:]
-            LSTspread = LSTref2-LSTref1
-
-        # LINEAR interpolation between the reference scans
-        specRef = (specref2-specref1)/LSTspread*(LSTspec-LSTref1) + specref1
-        # EXPERIMENTAL
-        if min_scale_reference:
-            if verbose > 2:
-                log.info("Rescaling specRef from {0} to {1}"
-                         .format(specRef[exslice].mean(),ref_scale))
-            specRef = specRef/specRef[exslice].mean() * ref_scale
-            if scale_airmass:
-                specRef += tatm/ref_cntstoK*(np.exp(-tauz*ref_airmass)-np.exp(-tauz*airmass))
-
-
-        # use a templated OFF spectrum
-        # (e.g., one that has had spectral lines interpolated over)
-        if off_template is not None:
-            if off_template.shape != specRef.shape:
-                raise ValueError("Off template shape does not match spectral shape")
-            # exclude spectral ends when ratio-ing
-            specRef = off_template * specRef[exslice].mean() / off_template[exslice].mean()
-
-        tsys = data['TSYS'][specindOn]
-        
-        # I don't think this is right... the correct way is to make sure
-        # specRef moves with Spec
-        #tsys_eff = tsys * np.exp(tau*airmass) - (np.exp(tau*airmass)-1)*tatm
-        tsys_eff = tsys * np.exp(tauz*airmass)
-
-        calSpec = (spec-specRef)/specRef * tsys_eff
-        if calSpec.sum() == 0:
-            raise ValueError("All values in calibrated spectrum are zero")
-
-        newdatadict['TSYS'][-1] = tsys
-        newdatadict['DATA'][-1] = calSpec
+    if highfreq:
+        newdatadict = cal_loop_highfreq(data, dataarr, newdatadict, OKsource,  speclen,
+                                        airmass_method, LSTrefs, exslice,
+                                        refscans, namelist, refarray, off_template, gain)
+    else:
+        newdatadict = cal_loop_lowfreq(data, dataarr, newdatadict, OKsource, CalOn,
+                                       CalOff, speclen, airmass_method,
+                                       LSTrefs, min_scale_reference, exslice,
+                                       tatm, tauz, refscans, namelist,
+                                       refarray, off_template)
 
     # how do I get the "Format" for the column definitions?
 
@@ -428,6 +444,31 @@ def get_min_scale_reference(data, min_scale_reference, OKsource=None,
 
     return ref_scale,ref_airmass
 
+def get_reference_highfreq(data, refscans, OK=None):
+    """
+    Extract the reference scans from the data, but don't try to calibrate them
+    with the noise calibrator (because we're doing high frequency)
+    """
+    dataarr = data['DATA']
+    speclen = dataarr.shape[1]
+
+    refarray = np.zeros([len(refscans),speclen])
+    LSTrefs  = np.zeros([len(refscans)])
+    for II,refscan in enumerate(refscans):
+        OKref = OK & (refscan == data['SCAN'])
+        # use "where" in case that reduces amount of stuff read in...
+        CalOnRef = np.nonzero(OKref)[0]
+
+        specrefon  = np.median(dataarr[CalOnRef,:],axis=0)
+
+        refarray[II] = specrefon
+        LSTrefs[II]  = np.mean(data['LST'][OKref])
+        if specrefon.sum() == 0:
+            raise ValueError("All values in reference scan %i are zero" % refscan)
+        elif np.isnan(specrefon).sum() > 0:
+            raise ValueError("Reference scan %i contains a NAN" % refscan)
+
+    return LSTrefs, refarray
 
 def get_reference(data, refscans, CalOn=None, CalOff=None,
                   exslice=slice(None), OK=None):
@@ -480,3 +521,147 @@ def get_reference(data, refscans, CalOn=None, CalOff=None,
             raise ValueError("Reference scan %i contains a NAN" % refscan)
 
     return LSTrefs, refarray, ref_cntstoK, tsysref
+
+def cal_loop_lowfreq(data, dataarr, newdatadict, OKsource, CalOn, CalOff, 
+                     speclen, airmass_method, LSTrefs, min_scale_reference,
+                     exslice, tatm, tauz, refscans, namelist, refarray,
+                     off_template):
+
+    for specindOn,specindOff in zip(np.where(OKsource*CalOn)[0],
+                                    np.where(OKsource*CalOff)[0]):
+
+        for K in namelist:
+            if K != 'DATA':
+                newdatadict[K].append(data[K][specindOn])
+            else:
+                # should this be speclen or 4096?  Changing to speclen...
+                newdatadict['DATA'].append(np.zeros(speclen))
+
+        # http://www.gb.nrao.edu/~rmaddale/Weather/
+        elev = data['ELEVATIO'][specindOn]
+        airmass = elev_to_airmass(elev,
+                                  method=airmass_method)
+
+        specOn = dataarr[specindOn,:]
+        specOff = dataarr[specindOff,:]
+        spec = (specOn + specOff)/2.0
+        LSTspec = data['LST'][specindOn]
+
+        # this "if" test is no longer necessary
+        if refscans is not None:
+            # find the reference scan closest to the current scan
+            # (LSTspec is a number, LSTrefs is an array, probably length 2)
+            refscannumber = np.argmin(np.abs(LSTspec-LSTrefs))
+            # if the closest reference scan is the last or it is after the spectrum...
+            # the earlier reference scan has index self-1
+            if refscannumber == len(refscans) - 1 or LSTrefs[refscannumber] > LSTspec:
+                r1 = refscannumber - 1
+                r2 = refscannumber
+            elif LSTrefs[refscannumber] < LSTspec:
+                r1 = refscannumber
+                r2 = refscannumber + 1
+            LSTref1 = LSTrefs[r1]
+            LSTref2 = LSTrefs[r2]
+            specref1 = refarray[r1,:]
+            specref2 = refarray[r2,:]
+            LSTspread = LSTref2-LSTref1
+
+        # LINEAR interpolation between the reference scans
+        specRef = (specref2-specref1)/LSTspread*(LSTspec-LSTref1) + specref1
+        # EXPERIMENTAL
+        if min_scale_reference:
+            if verbose > 2:
+                log.info("Rescaling specRef from {0} to {1}"
+                         .format(specRef[exslice].mean(),ref_scale))
+            specRef = specRef/specRef[exslice].mean() * ref_scale
+            if scale_airmass:
+                specRef += tatm/ref_cntstoK*(np.exp(-tauz*ref_airmass)-np.exp(-tauz*airmass))
+
+
+        # use a templated OFF spectrum
+        # (e.g., one that has had spectral lines interpolated over)
+        if off_template is not None:
+            if off_template.shape != specRef.shape:
+                raise ValueError("Off template shape does not match spectral shape")
+            # exclude spectral ends when ratio-ing
+            specRef = off_template * specRef[exslice].mean() / off_template[exslice].mean()
+
+        tsys = data['TSYS'][specindOn]
+        
+        # I don't think this is right... the correct way is to make sure
+        # specRef moves with Spec
+        #tsys_eff = tsys * np.exp(tau*airmass) - (np.exp(tau*airmass)-1)*tatm
+        tsys_eff = tsys * np.exp(tauz*airmass)
+
+        calSpec = (spec-specRef)/specRef * tsys_eff
+        if calSpec.sum() == 0:
+            raise ValueError("All values in calibrated spectrum are zero")
+
+        newdatadict['TSYS'][-1] = tsys
+        newdatadict['DATA'][-1] = calSpec
+
+        return newdatadict
+
+def cal_loop_highfreq(data, dataarr, newdatadict, OKsource,  speclen,
+                      airmass_method, LSTrefs, exslice, refscans, namelist,
+                      refarray, off_template, gain):
+
+    inds = np.where(OKsource)[0]
+    for specindOn in ProgressBar(inds):
+
+        for K in namelist:
+            if K != 'DATA':
+                newdatadict[K].append(data[K][specindOn])
+            else:
+                # should this be speclen or 4096?  Changing to speclen...
+                newdatadict['DATA'].append(np.zeros(speclen))
+
+        # http://www.gb.nrao.edu/~rmaddale/Weather/
+        elev = data['ELEVATIO'][specindOn]
+        airmass = elev_to_airmass(elev,
+                                  method=airmass_method)
+
+        spec = specOn = dataarr[specindOn,:]
+        LSTspec = data['LST'][specindOn]
+
+        # this "if" test is no longer necessary
+        if refscans is not None:
+            # find the reference scan closest to the current scan
+            # (LSTspec is a number, LSTrefs is an array, probably length 2)
+            refscannumber = np.argmin(np.abs(LSTspec-LSTrefs))
+            # if the closest reference scan is the last or it is after the spectrum...
+            # the earlier reference scan has index self-1
+            if refscannumber == len(refscans) - 1 or LSTrefs[refscannumber] > LSTspec:
+                r1 = refscannumber - 1
+                r2 = refscannumber
+            elif LSTrefs[refscannumber] < LSTspec:
+                r1 = refscannumber
+                r2 = refscannumber + 1
+            LSTref1 = LSTrefs[r1]
+            LSTref2 = LSTrefs[r2]
+            specref1 = refarray[r1,:]
+            specref2 = refarray[r2,:]
+            LSTspread = LSTref2-LSTref1
+
+        # LINEAR interpolation between the reference scans
+        specRef = (specref2-specref1)/LSTspread*(LSTspec-LSTref1) + specref1
+
+        # use a templated OFF spectrum
+        # (e.g., one that has had spectral lines interpolated over)
+        if off_template is not None:
+            if off_template.shape != specRef.shape:
+                raise ValueError("Off template shape does not match spectral shape")
+            # exclude spectral ends when ratio-ing
+            specRef = off_template * specRef[exslice].mean() / off_template[exslice].mean()
+
+        tsys = data['TSYS'][specindOn]
+        
+        calSpec = (spec-specRef)*gain
+
+        if calSpec.sum() == 0:
+            raise ValueError("All values in calibrated spectrum are zero")
+
+        newdatadict['TSYS'][-1] = tsys
+        newdatadict['DATA'][-1] = calSpec
+
+    return newdatadict
