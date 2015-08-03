@@ -448,7 +448,10 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
         #cd = np.abs(np.prod((wcs.wcs.get_cdelt() * wcs.wcs.get_pc().diagonal())))**0.5
 
     if velocityrange is not None:
-        v1,v4 = velocityrange * default_unit
+        if hasattr(velocityrange, 'unit'):
+            v1,v4 = velocityrange
+        else:
+            v1,v4 = velocityrange * default_unit
         ind1 = np.argmin(np.abs(np.floor(v1-cubevelo)))
         ind2 = np.argmin(np.abs(np.ceil(v4-cubevelo)))+1
 
