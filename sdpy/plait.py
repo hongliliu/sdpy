@@ -60,7 +60,7 @@ def plait_cube(cubes, angles, scale, weights=None, nanification='default_good'):
     if weights is None:
         weights = [None for c in cubes]
 
-    for ind in ProgressBar(xrange(cubes[0].shape[0])):
+    for ind in ProgressBar(range(cubes[0].shape[0])):
         outcube[ind, :, :] = plait_plane([c[ind,:,:]
                                           for c in cubes],
                                          angles,

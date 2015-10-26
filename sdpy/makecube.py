@@ -137,7 +137,7 @@ def data_iterator(data,continuum=False,fsw=False):
     if hasattr(data,'SPECTRA'):
         shape0 = data.SPECTRA.shape[0]
         shape1 = data.SPECTRA.shape[1]
-        for ii in xrange(shape0):
+        for ii in range(shape0):
             if continuum:
                 yield data.SPECTRA[ii,shape1*0.1:shape1*0.9].mean()
             else:
@@ -149,7 +149,7 @@ def data_iterator(data,continuum=False,fsw=False):
     elif hasattr(data,'DATA'):
         shape0 = data.DATA.shape[0]
         shape1 = data.DATA.shape[1]
-        for ii in xrange(shape0):
+        for ii in range(shape0):
             if continuum:
                 yield data.DATA[ii,shape1*0.1:shape1*0.9].mean()
             else:
@@ -197,11 +197,11 @@ def coord_iterator(data,coordsys_out='galactic'):
     else:
         raise Exception("No CRVAL or GLON struct in data.")
 
-    for ii in xrange(len(data)):
+    for ii in range(len(data)):
             yield lon[ii],lat[ii]
 
 def velo_iterator(data,linefreq=None,useFreq=True, subvframe=True):
-    for ii in xrange(data.CRPIX1.shape[0]):
+    for ii in range(data.CRPIX1.shape[0]):
         if hasattr(data,'SPECTRA'):
             npix = data.SPECTRA.shape[1]
             CRPIX = data.CRPIX1[ii]
@@ -732,20 +732,20 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
 
     if log.level <= 10:
         nnan = np.sum(np.isnan(subcube))
-        print "subcube statistics: mean, std, nzeros, size, nnan, ngood:",np.nansum(subcube)/subcube.size,np.std(subcube[subcube==subcube]),np.sum(subcube==0), subcube.size, nnan, subcube.size-nnan
-        print "subcube shape: ",subcube.shape
+        print("subcube statistics: mean, std, nzeros, size, nnan, ngood:",np.nansum(subcube)/subcube.size,np.std(subcube[subcube==subcube]),np.sum(subcube==0), subcube.size, nnan, subcube.size-nnan)
+        print("subcube shape: ",subcube.shape)
 
     H = header.copy()
     if fileheader is not None:
-        for k,v in fileheader.iteritems():
+        for k,v in fileheader.items():
             if 'RESTFRQ' in k or 'RESTFREQ' in k:
                 header.set(k,v)
             #if k[0] == 'C' and '1' in k and k[-1] != '1':
             #    header.set(k.replace('1','3'), v)
     moreH = get_header(cubeheader)
-    for k,v in H.iteritems():
+    for k,v in H.items():
         header.set(k,v)
-    for k,v in moreH.iteritems():
+    for k,v in moreH.items():
         header.set(k,v)
     HDU = pyfits.PrimaryHDU(data=subcube,header=header)
     HDU.writeto(cubefilename,clobber=True,output_verify='fix')
@@ -791,35 +791,35 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     scriptfile = open(outpre+"_starlink.sh",'w')
     outpath,outfn = os.path.split(cubefilename)
     outpath,pre = os.path.split(outpre)
-    print >>scriptfile,("#!/bin/bash")
+    print(("#!/bin/bash"), file=scriptfile)
     if outpath != '':
-        print >>scriptfile,('cd %s' % outpath)
-    print >>scriptfile,('. /star/etc/profile')
-    print >>scriptfile,('kappa > /dev/null')
-    print >>scriptfile,('convert > /dev/null')
-    print >>scriptfile,('fits2ndf %s %s' % (outfn,outfn.replace(".fits",".sdf")))
+        print(('cd %s' % outpath), file=scriptfile)
+    print(('. /star/etc/profile'), file=scriptfile)
+    print(('kappa > /dev/null'), file=scriptfile)
+    print(('convert > /dev/null'), file=scriptfile)
+    print(('fits2ndf %s %s' % (outfn,outfn.replace(".fits",".sdf"))), file=scriptfile)
     if excludefitrange is not None:
         v2v3 = ""
         for v2,v3 in zip(excludefitrange[::2],excludefitrange[1::2]):
             v2v3 += "%0.2f %0.2f " % (v2.to(default_unit).value,v3.to(default_unit).value)
-        print >>scriptfile,('mfittrend %s  ranges=\\\"%0.2f %s %0.2f\\\" order=%i axis=3 out=%s' % (outfn.replace(".fits",".sdf"),v1.to(default_unit).value,v2v3,v4.to(default_unit).value,baselineorder,outfn.replace(".fits","_baseline.sdf")))
+        print(('mfittrend %s  ranges=\\\"%0.2f %s %0.2f\\\" order=%i axis=3 out=%s' % (outfn.replace(".fits",".sdf"),v1.to(default_unit).value,v2v3,v4.to(default_unit).value,baselineorder,outfn.replace(".fits","_baseline.sdf"))), file=scriptfile)
     else:
-        print >>scriptfile,('mfittrend %s  ranges=\\\"%0.2f %0.2f\\\" order=%i axis=3 out=%s' % (outfn.replace(".fits",".sdf"),v1.to(default_unit).value,v4.to(default_unit).value,baselineorder,outfn.replace(".fits","_baseline.sdf")))
-    print >>scriptfile,('sub %s %s %s' % (outfn.replace(".fits",".sdf"),outfn.replace(".fits","_baseline.sdf"),outfn.replace(".fits","_sub.sdf")))
-    print >>scriptfile,('sqorst %s_sub mode=pixelscale  axis=3 pixscale=%i out=%s_vrebin' % (pre,smoothto,pre))
-    print >>scriptfile,('gausmooth %s_vrebin fwhm=1.0 axes=[1,2] out=%s_smooth' % (pre,pre))
-    print >>scriptfile,('#collapse %s estimator=mean axis="VRAD" low=-400 high=500 out=%s_continuum' % (pre,pre))
-    print >>scriptfile,('rm %s_sub.fits' % (pre))
-    print >>scriptfile,('ndf2fits %s_sub %s_sub.fits' % (pre,pre))
-    print >>scriptfile,('rm %s_smooth.fits' % (pre))
-    print >>scriptfile,('ndf2fits %s_smooth %s_smooth.fits' % (pre,pre))
-    print >>scriptfile,("# Fix STARLINK's failure to respect header keywords.")
-    print >>scriptfile,('sethead %s_smooth.fits RESTFRQ=`gethead RESTFRQ %s.fits`' % (pre,pre))
-    print >>scriptfile,('rm %s_baseline.sdf' % (pre))
-    print >>scriptfile,('rm %s_smooth.sdf' % (pre))
-    print >>scriptfile,('rm %s_sub.sdf' % (pre))
-    print >>scriptfile,('rm %s_vrebin.sdf' % (pre))
-    print >>scriptfile,('rm %s.sdf' % (pre))
+        print(('mfittrend %s  ranges=\\\"%0.2f %0.2f\\\" order=%i axis=3 out=%s' % (outfn.replace(".fits",".sdf"),v1.to(default_unit).value,v4.to(default_unit).value,baselineorder,outfn.replace(".fits","_baseline.sdf"))), file=scriptfile)
+    print(('sub %s %s %s' % (outfn.replace(".fits",".sdf"),outfn.replace(".fits","_baseline.sdf"),outfn.replace(".fits","_sub.sdf"))), file=scriptfile)
+    print(('sqorst %s_sub mode=pixelscale  axis=3 pixscale=%i out=%s_vrebin' % (pre,smoothto,pre)), file=scriptfile)
+    print(('gausmooth %s_vrebin fwhm=1.0 axes=[1,2] out=%s_smooth' % (pre,pre)), file=scriptfile)
+    print(('#collapse %s estimator=mean axis="VRAD" low=-400 high=500 out=%s_continuum' % (pre,pre)), file=scriptfile)
+    print(('rm %s_sub.fits' % (pre)), file=scriptfile)
+    print(('ndf2fits %s_sub %s_sub.fits' % (pre,pre)), file=scriptfile)
+    print(('rm %s_smooth.fits' % (pre)), file=scriptfile)
+    print(('ndf2fits %s_smooth %s_smooth.fits' % (pre,pre)), file=scriptfile)
+    print(("# Fix STARLINK's failure to respect header keywords."), file=scriptfile)
+    print(('sethead %s_smooth.fits RESTFRQ=`gethead RESTFRQ %s.fits`' % (pre,pre)), file=scriptfile)
+    print(('rm %s_baseline.sdf' % (pre)), file=scriptfile)
+    print(('rm %s_smooth.sdf' % (pre)), file=scriptfile)
+    print(('rm %s_sub.sdf' % (pre)), file=scriptfile)
+    print(('rm %s_vrebin.sdf' % (pre)), file=scriptfile)
+    print(('rm %s.sdf' % (pre)), file=scriptfile)
     scriptfile.close()
 
     if chmod:
@@ -860,7 +860,7 @@ def _fix_ms_kms_file(filename):
         f[0].header = _fix_ms_kms_header(f[0].header)
         f.writeto(filename,clobber=True)
     else:
-        print "{0} does not exist".format(filename)
+        print("{0} does not exist".format(filename))
 
 try:
     from pyspeckit import cubes
@@ -891,7 +891,7 @@ try:
 
 except:
     def make_flats(*args, **kwargs):
-        print "Make flats did not import"
+        print("Make flats did not import")
 
 def make_taucube(cubename,continuum=0.0,continuum_units='K',TCMB=2.7315,
                  etamb=1., suffix="_sub.fits", outsuffix='.fits',

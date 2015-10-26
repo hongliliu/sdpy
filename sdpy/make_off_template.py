@@ -187,8 +187,8 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
 
     if interp_vrange:
         # interpolate across the excluded regions
-        velo = velo_iterator(data,linefreq=linefreq).next()
-        if debug: print 'min,max velo',velo.min(),velo.max()
+        velo = next(velo_iterator(data,linefreq=linefreq))
+        if debug: print('min,max velo',velo.min(),velo.max())
         OKvelo = (velo > interp_vrange[0]) * (velo < interp_vrange[1]) 
     if exclude_velo:
         nOKvelo = np.zeros(velo.size,dtype='bool')
@@ -230,8 +230,8 @@ def make_off(fitsfile, scanrange=[], sourcename=None, feednum=1, sampler=0,
 
     if savefile:
         if not 'velo' in locals():
-            velo = velo_iterator(data,linefreq=linefreq).next()
-        if debug: print 'min,max velo',velo.min(),velo.max()
+            velo = next(velo_iterator(data,linefreq=linefreq))
+        if debug: print('min,max velo',velo.min(),velo.max())
         header = generate_1d_header_fromdisparray(velo*u.km/u.s,
                                                   reference=linefreq*u.Hz
                                                   if linefreq is not None else None)

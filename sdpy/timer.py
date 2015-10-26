@@ -7,7 +7,7 @@ def print_timing(func):
         t1 = time.time()
         res = func(*arg,**kwargs)
         t2 = time.time()
-        print '%s took %0.5g s' % (func.func_name, (t2-t1))
+        print('%s took %0.5g s' % (func.__name__, (t2-t1)))
         return res
     return wrapper
 

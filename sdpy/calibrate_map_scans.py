@@ -17,19 +17,19 @@ def load_data_file(filename, extension=1, dataarr=None, filepyfits=None,
         datapyfits = filepyfits[extension].data
     else:
         try:
-            print "Treating file as an open FITS HDU... ",
+            print("Treating file as an open FITS HDU... ", end=' ')
             datapyfits = filename[extension].data
         except AttributeError:
-            print "File is not an HDU.  Reading file from disk using pyfits...",
+            print("File is not an HDU.  Reading file from disk using pyfits...", end=' ')
             if isinstance(filename,str):
                 filepyfits = pyfits.open(filename,memmap=True)
                 datapyfits = filepyfits[extension].data
             else:
-                print "Assuming file is a FITS BinaryTableHDU"
+                print("Assuming file is a FITS BinaryTableHDU")
                 datapyfits = filename
     if dataarr is None:
         dataarr = datapyfits['DATA']
-    print "Data successfully read"
+    print("Data successfully read")
     namelist = datapyfits.names
     data = datapyfits
 
@@ -338,7 +338,7 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
 
     # Make Table
     cols = [pyfits.Column(name=key,format=formatdict[key],array=value)
-            for key,value in newdatadict.iteritems()]
+            for key,value in newdatadict.items()]
     colsP = pyfits.ColDefs(cols)
     #tablehdu = copy.copy(filepyfits[extension])
     #tablehdu.data = colsP
@@ -390,7 +390,7 @@ def compute_tsys(data, tsysmethod='perscan', OKsource=None, CalOn=None,
 
             tsys = (offmean / diffmean * tcal + tcal/2.0)
             if verbose > 1:
-                print "Scan %4i:  TSYS=%12.3f" % (scanid,tsys)
+                print("Scan %4i:  TSYS=%12.3f" % (scanid,tsys))
             data['TSYS'][whscan] = tsys
     elif tsysmethod == 'perint':
         on_data = dataarr[CalOn & OKsource,exslice]
@@ -657,8 +657,8 @@ def cal_loop_highfreq(data, dataarr, newdatadict, OKsource,  speclen,
         tsys = data['TSYS'][specindOn]
 
         if isinstance(gain, dict):
-            gaintimes = np.array(gain.keys())
-            gains = np.array([v[0] for v in gain.values()])
+            gaintimes = np.array(list(gain.keys()))
+            gains = np.array([v[0] for v in list(gain.values())])
             nearest_gain = np.argmin(np.abs(gaintimes-LSTspec))
             if (nearest_gain == 0 or (gaintimes[nearest_gain] < LSTspec and
                                       nearest_gain < len(gaintimes)-1)):
