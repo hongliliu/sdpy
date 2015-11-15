@@ -16,12 +16,12 @@ Tools for:
  * Generation of artificial off positions by averaging all positions in OTF maps
  * calibration of position-switched data using those off positions
  * Gridding OTF data using a user-specified kernel
- 
+
 Requirements
 ------------
 
  * astropy
-
+ * matplotlib
 
 [![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/keflavich/sdpy/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
 
