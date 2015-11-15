@@ -1,3 +1,4 @@
+from __future__ import print_function
 import astropy.io.fits as pyfits
 import numpy as np
 import warnings
