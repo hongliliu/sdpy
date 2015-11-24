@@ -5,10 +5,10 @@ try:
 except ImportError:
     import pyfits
     import pywcs
-#import coords
+
 from astropy import coordinates, constants
 from astropy import units as u
-from astropy.convolution import convolve,Gaussian1DKernel,Gaussian2DKernel
+from astropy.convolution import Gaussian1DKernel, Gaussian2DKernel
 import numpy as np
 import pylab
 try:
@@ -721,7 +721,7 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
 
     log.debug("nhits statistics: mean, std, nzeros, size {0} {1} {2} {3}".format(nhits.mean(),nhits.std(),np.sum(nhits==0), nhits.size))
     log.debug("Image statistics: mean, std, nzeros, size {0} {1} {2} {3}".format(image.mean(),image.std(),np.sum(image==0), image.size))
-    
+
     imav = image/nhits
 
     if log.level <= 10:
