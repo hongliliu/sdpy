@@ -1,6 +1,6 @@
 from ._astropy_init import *
 
-if not _ASTROPY_SETUP:
+if not _ASTROPY_SETUP_:
     from . import makecube
     from . import make_off_template
     from . import calibrate_map_scans
