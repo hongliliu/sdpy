@@ -33,3 +33,4 @@ Reference/API
 =============
 
 .. automodapi:: sdpy
+    :no-heading:
