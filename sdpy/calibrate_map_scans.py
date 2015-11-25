@@ -253,7 +253,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         raise ValueError("No matches to sampler {0}".format(sampler))
     OK *= data['FEED'] == feednum
     if np.count_nonzero(OK) == 0:
-        raise ValueError("No matches to sampler {0} and feed {1}".format(sampler, feednum))
+        raise ValueError("No matches to sampler {0} and feed {1}"
+                         .format(sampler, feednum))
     OK *= np.isfinite(data['DATA'].sum(axis=1))
     if np.count_nonzero(OK) == 0:
         raise ValueError("There is no finite data.")
@@ -265,7 +266,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
     if scanrange is not []:
         OKsource &= (scanrange[0] < data['SCAN'])&(data['SCAN'] < scanrange[1])
         if np.count_nonzero(OKsource) == 0:
-            raise ValueError("No scans in range {0}-{1}".format(scanrange[0], scanrange[1]))
+            raise ValueError("No scans in range {0}-{1}".format(scanrange[0],
+                                                                scanrange[1]))
     if obsmode is not None:
         OBSMODE = np.core.defchararray.rstrip(data.OBSMODE)
         OKsource &= ((obsmode == data.OBSMODE) |
@@ -273,7 +275,9 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
                      ((obsmode+":NONE:TPNOCAL") == data.OBSMODE)
                     )
         if np.count_nonzero(OKsource) == 0:
-            raise ValueError("No matches to OBSMODE={0}".format(obsmode))
+            raise ValueError("No matches to OBSMODE={0}."
+                             "  Valid modes include {1}".format(obsmode,
+                                                                set(OBSMODE)))
     if sourcename is None and scanrange is None:
         raise IndexError("Must specify a source name and/or a scan range")
 
