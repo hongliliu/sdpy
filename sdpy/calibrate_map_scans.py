@@ -270,9 +270,9 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
                                                                 scanrange[1]))
     if obsmode is not None:
         OBSMODE = np.core.defchararray.rstrip(data.OBSMODE)
-        OKsource &= ((obsmode == data.OBSMODE) |
-                     ((obsmode+":NONE:TPWCAL") == data.OBSMODE) |
-                     ((obsmode+":NONE:TPNOCAL") == data.OBSMODE)
+        OKsource &= ((obsmode == OBSMODE) |
+                     ((obsmode+":NONE:TPWCAL") == OBSMODE) |
+                     ((obsmode+":NONE:TPNOCAL") == OBSMODE)
                     )
         if np.count_nonzero(OKsource) == 0:
             raise ValueError("No matches to OBSMODE={0}."
