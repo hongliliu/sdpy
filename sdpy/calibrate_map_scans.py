@@ -247,8 +247,14 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         sampler = samplers[sampler]
 
     OK = data['SAMPLER'] == sampler
+    if np.count_nonzero(OK) == 0:
+        raise ValueError("No matches to sampler {0}".format(sampler))
     OK *= data['FEED'] == feednum
+    if np.count_nonzero(OK) == 0:
+        raise ValueError("No matches to sampler {0} and feed {1}".format(sampler, feednum))
     OK *= np.isfinite(data['DATA'].sum(axis=1))
+    if np.count_nonzero(OK) == 0:
+        raise ValueError("There is no finite data.")
     OKsource = OK.copy()
     if sourcename is not None:
         OKsource &= (data['OBJECT'] == sourcename)
@@ -496,6 +502,8 @@ def get_reference(data, refscans, CalOn=None, CalOff=None,
     LSTrefs  = np.zeros([len(refscans)])
     for II,refscan in enumerate(refscans):
         OKref = OK & (refscan == data['SCAN'])
+        if np.count_nonzero(OKref) == 0:
+            raise ValueError("No 'OK' data for scan {0}".format(refscan))
         # use "where" in case that reduces amount of stuff read in...
         CalOnRef = np.nonzero(OKref & CalOn)[0]
         CalOffRef = np.nonzero(OKref & CalOff)[0]
