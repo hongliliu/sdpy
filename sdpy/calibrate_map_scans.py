@@ -258,13 +258,19 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
     OKsource = OK.copy()
     if sourcename is not None:
         OKsource &= (data['OBJECT'] == sourcename)
+        if np.count_nonzero(OKsource) == 0:
+            raise ValueError("Object {0} not in data".format(sourcename))
     if scanrange is not []:
         OKsource &= (scanrange[0] < data['SCAN'])*(data['SCAN'] < scanrange[1])
+        if np.count_nonzero(OKsource) == 0:
+            raise ValueError("No scans in range {0}-{1}".format(scanrange[0], scanrange[1]))
     if obsmode is not None:
         OKsource &= ((obsmode == data.OBSMODE) |
                      ((obsmode+":NONE:TPWCAL") == data.OBSMODE) |
                      ((obsmode+":NONE:TPNOCAL") == data.OBSMODE)
                     )
+        if np.count_nonzero(OKsource) == 0:
+            raise ValueError("No matches to OBSMODE={0}".format(obsmode))
     if sourcename is None and scanrange is None:
         raise IndexError("Must specify a source name and/or a scan range")
 
