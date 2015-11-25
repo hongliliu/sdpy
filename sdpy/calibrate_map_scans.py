@@ -357,6 +357,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
     cols = [pyfits.Column(name=key,format=formatdict[key],array=value)
             for key,value in newdatadict.items()]
     colsP = pyfits.ColDefs(cols)
+    if verbose:
+        log.info("Writing out new table with length {0}".format(len(colsP)))
     #tablehdu = copy.copy(filepyfits[extension])
     #tablehdu.data = colsP
     # this lies and claims corrupted
