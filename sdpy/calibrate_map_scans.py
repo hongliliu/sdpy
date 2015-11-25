@@ -283,7 +283,10 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
 
     if verbose:
         log.info("Beginning scan selection and calibration for "
-                 "sampler %s and feed %s" % (sampler,feednum))
+                 "sampler {0} and feed {1}.  Found {2} matching"
+                 "scans and {3} with the source {4} in it."
+                 .format(sampler,feednum, OK.sum(), OKsource.sum(),
+                         sourcename))
 
     CalOff = (data['CAL']=='F')
     CalOn  = (data['CAL']=='T')
