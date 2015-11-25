@@ -43,7 +43,9 @@ def compute_gains_highfreq(data, feednum=1, sampler=0, tcold=50.):
     Compute all gains as a function of time for a feed / sampler
     """
 
-    calseqs = ((data['OBSMODE'] == 'CALSEQ:NONE:TPNOCAL') &
+    OBSMODE = np.core.defchararray.rstrip(data['OBSMODE'])
+
+    calseqs = ((OBSMODE == 'CALSEQ:NONE:TPNOCAL') &
                (data['FEED'] == feednum) &
                (data['SAMPLER'] == sampler)
                )
@@ -261,10 +263,11 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         if np.count_nonzero(OKsource) == 0:
             raise ValueError("Object {0} not in data".format(sourcename))
     if scanrange is not []:
-        OKsource &= (scanrange[0] < data['SCAN'])*(data['SCAN'] < scanrange[1])
+        OKsource &= (scanrange[0] < data['SCAN'])&(data['SCAN'] < scanrange[1])
         if np.count_nonzero(OKsource) == 0:
             raise ValueError("No scans in range {0}-{1}".format(scanrange[0], scanrange[1]))
     if obsmode is not None:
+        OBSMODE = np.core.defchararray.rstrip(data.OBSMODE)
         OKsource &= ((obsmode == data.OBSMODE) |
                      ((obsmode+":NONE:TPWCAL") == data.OBSMODE) |
                      ((obsmode+":NONE:TPNOCAL") == data.OBSMODE)
