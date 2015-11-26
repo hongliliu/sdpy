@@ -257,7 +257,7 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
                          .format(sampler, feednum))
     # This can result in an asymmetric # of on/off scans, which sucks.
     #OK &= np.isfinite(data['DATA'].sum(axis=1))
-    isfinite = np.isfinite(data['DATA'].sum(axis=1))
+    isfinite = np.isfinite(data['DATA']).min(axis=1)
     if np.count_nonzero(isfinite) == 0:
         raise ValueError("There is no finite data.")
     OKsource = OK.copy()
