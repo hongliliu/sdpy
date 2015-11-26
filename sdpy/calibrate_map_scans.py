@@ -552,8 +552,11 @@ def cal_loop_lowfreq(data, dataarr, newdatadict, OKsource, CalOn, CalOff,
                      exslice, tatm, tauz, refscans, namelist, refarray,
                      off_template):
 
-    for specindOn,specindOff in zip(np.where(OKsource*CalOn)[0],
-                                    np.where(OKsource*CalOff)[0]):
+    calOnInds = np.nonzero(OKsource&CalOn)[0]
+    calOffInds = np.nonzero(OKsource&CalOff)[0]
+
+    log.debug("Looping over {0} cal-on and {1} cal-off scans".format(len(calOnInds), len(calOffInds)))
+    for specindOn,specindOff in zip(calOnInds, calOffInds):
 
         for K in namelist:
             if K != 'DATA':
