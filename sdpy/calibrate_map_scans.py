@@ -283,7 +283,7 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
 
     if verbose:
         log.info("Beginning scan selection and calibration for "
-                 "sampler {0} and feed {1}.  Found {2} matching"
+                 "sampler {0} and feed {1}.  Found {2} matching "
                  "scans and {3} with the source {4} in it."
                  .format(sampler,feednum, OK.sum(), OKsource.sum(),
                          sourcename))
@@ -340,6 +340,7 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         if verbose:
             log.info("EXPERIMENTAL: min_scale_reference = {0}".format(ref_scale))
 
+    log.debug("data.shape = {0}, dataarr.shape = {1}, tsys=[{2}-{3}]".format(data.shape, dataarr.shape, tsys.min(), tsys.max()))
     if highfreq:
         newdatadict = cal_loop_highfreq(data, dataarr, newdatadict, OKsource,  speclen,
                                         airmass_method, LSTrefs, exslice,
