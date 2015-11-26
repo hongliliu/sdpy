@@ -354,6 +354,7 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
                                        LSTrefs, min_scale_reference, exslice,
                                        tatm, tauz, refscans, namelist,
                                        refarray, off_template)
+    log.debug("newdatadict has length {0}, and its data entry has length {1}".format(len(newdatadict), len(newdatadict['DATA'])))
 
     # how do I get the "Format" for the column definitions?
 
@@ -563,7 +564,9 @@ def cal_loop_lowfreq(data, dataarr, newdatadict, OKsource, CalOn, CalOff,
                 newdatadict[K].append(data[K][specindOn])
             else:
                 # should this be speclen or 4096?  Changing to speclen...
-                newdatadict['DATA'].append(np.zeros(speclen))
+                # No need to really populate this here, though: it will be
+                # replaced at the end of the function
+                newdatadict['DATA'].append([])
 
         # http://www.gb.nrao.edu/~rmaddale/Weather/
         elev = data['ELEVATIO'][specindOn]
