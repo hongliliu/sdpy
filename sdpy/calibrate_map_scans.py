@@ -564,12 +564,23 @@ def cal_loop_lowfreq(data, dataarr, newdatadict, OKsource, CalOn, CalOff,
                      exslice, tatm, tauz, refscans, namelist, refarray,
                      off_template, isfinite):
 
+    # cache data locally: one-time read from file to speed things up
+    local_data = data[OKsource&(CalOn|CalOff)]
+
+    # shrink OKsource, CalOn, CalOff
+    OKsource_ = OKsource[OKsource&(CalOn|CalOff)]
+    CalOn_ = CalOn[OKsource&(CalOn|CalOff)]
+    CalOff_ = CalOff[OKsource&(CalOn|CalOff)]
+
+    OKsource,CalOn,CalOff = OKsource_,CalOn_,CalOff_
+
     calOnInds = np.nonzero(OKsource&CalOn)[0]
     calOffInds = np.nonzero(OKsource&CalOff)[0]
     nON,nOFF = len(calOnInds), len(calOffInds)
     if nON != nOFF:
         raise ValueError("Number of cal diode 'on' scans does not match "
                          "number of 'off' scans")
+
 
     log.debug("Looping over {0} cal-on and {1} cal-off scans".format(nON, nOFF))
     for specindOn,specindOff in ProgressBar(zip(calOnInds, calOffInds)):
