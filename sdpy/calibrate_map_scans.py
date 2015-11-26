@@ -327,6 +327,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
                      CalOff=CalOff, exslice=exslice, verbose=verbose)
     else:
         data['TSYS'] = tsys
+    if np.any(np.isnan(data['TSYS'])):
+        raise ValueError("NaNs in TSYS")
 
     # experimental: try to rescale the "reference" scan to be the minimum
     if min_scale_reference:
