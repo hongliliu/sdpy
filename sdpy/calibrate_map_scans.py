@@ -251,11 +251,11 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
     OK = data['SAMPLER'] == sampler
     if np.count_nonzero(OK) == 0:
         raise ValueError("No matches to sampler {0}".format(sampler))
-    OK *= data['FEED'] == feednum
+    OK &= data['FEED'] == feednum
     if np.count_nonzero(OK) == 0:
         raise ValueError("No matches to sampler {0} and feed {1}"
                          .format(sampler, feednum))
-    OK *= np.isfinite(data['DATA'].sum(axis=1))
+    OK &= np.isfinite(data['DATA'].sum(axis=1))
     if np.count_nonzero(OK) == 0:
         raise ValueError("There is no finite data.")
     OKsource = OK.copy()
@@ -323,8 +323,9 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
                          " with the calibration diode on.  That can't be right.")
 
     if tsys is None:
-        compute_tsys(data, tsysmethod=tsysmethod, OKsource=OKsource, CalOn=CalOn,
-                     CalOff=CalOff, exslice=exslice, verbose=verbose)
+        compute_tsys(data, tsysmethod=tsysmethod, OKsource=OKsource, OK=OK,
+                     CalOn=CalOn, CalOff=CalOff, exslice=exslice,
+                     verbose=verbose)
     else:
         data['TSYS'] = tsys
     if np.any(np.isnan(data['TSYS'])):
@@ -376,8 +377,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         return filepyfits,data,colsP
 
 
-def compute_tsys(data, tsysmethod='perscan', OKsource=None, CalOn=None,
-                 CalOff=None, verbose=False, exslice=slice(None)):
+def compute_tsys(data, tsysmethod='perscan', OKsource=None, OK=None,
+                 CalOn=None, CalOff=None, verbose=False, exslice=slice(None)):
     """
     Calculate the TSYS vector for a set of scans
 
@@ -386,9 +387,9 @@ def compute_tsys(data, tsysmethod='perscan', OKsource=None, CalOn=None,
 
     """
     if CalOn is None:
-        CalOn  = (data['CAL']=='T')
+        CalOn  = (data['CAL']=='T') & OK
     if CalOff is None:
-        CalOff = (data['CAL']=='F')
+        CalOff = (data['CAL']=='F') & OK
 
     dataarr = data['DATA']
 
@@ -400,7 +401,7 @@ def compute_tsys(data, tsysmethod='perscan', OKsource=None, CalOn=None,
         # TSYS.
         scannumbers = np.unique(data['SCAN'][OKsource])
         for scanid in scannumbers:
-            whscan = data['SCAN'] == scanid
+            whscan = (data['SCAN'] == scanid) & OK
 
             on_data = dataarr[whscan & CalOn,exslice]
             off_data = dataarr[whscan & CalOff,exslice]
