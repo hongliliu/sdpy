@@ -340,7 +340,7 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         if verbose:
             log.info("EXPERIMENTAL: min_scale_reference = {0}".format(ref_scale))
 
-    log.debug("data.shape = {0}, dataarr.shape = {1}, tsys=[{2}-{3}]".format(data.shape, dataarr.shape, tsys.min(), tsys.max()))
+    log.debug("data.shape = {0}, dataarr.shape = {1}, tsys=[{2}-{3}]".format(data.shape, dataarr.shape, data['TSYS'].min(), data['TSYS'].max()))
     if highfreq:
         newdatadict = cal_loop_highfreq(data, dataarr, newdatadict, OKsource,  speclen,
                                         airmass_method, LSTrefs, exslice,
