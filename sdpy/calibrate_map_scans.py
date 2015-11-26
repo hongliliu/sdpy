@@ -384,7 +384,7 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
 
 def compute_tsys(data, tsysmethod='perscan', OKsource=None, OK=None,
                  CalOn=None, CalOff=None, verbose=False, exslice=slice(None),
-                 isfinite=isfinite):
+                 isfinite=None):
     """
     Calculate the TSYS vector for a set of scans
 
