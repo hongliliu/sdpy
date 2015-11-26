@@ -631,7 +631,9 @@ def cal_loop_lowfreq(data, dataarr, newdatadict, OKsource, CalOn, CalOff,
         newdatadict['TSYS'][-1] = tsys
         newdatadict['DATA'][-1] = calSpec
 
-        return newdatadict
+    log.debug("in cal_loop_lowfreq, newdatadict has length {0}, and its data entry has length {1}".format(len(newdatadict), len(newdatadict['DATA'])))
+
+    return newdatadict
 
 def cal_loop_highfreq(data, dataarr, newdatadict, OKsource,  speclen,
                       airmass_method, LSTrefs, exslice, refscans, namelist,
