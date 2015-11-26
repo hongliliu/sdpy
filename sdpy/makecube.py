@@ -201,9 +201,13 @@ def coord_iterator(data,coordsys_out='galactic'):
     for ii in range(len(data)):
             yield lon[ii],lat[ii]
 
-def velo_iterator(data,linefreq=None,useFreq=True, subvframe=True):
+def velo_iterator(data, linefreq=None, useFreq=True, subvframe=True):
+    """
+    Yield a velocity axis array
+    """
     for ii in range(data.CRPIX1.shape[0]):
         if hasattr(data,'SPECTRA'):
+            # for Arecibo data, primarily
             npix = data.SPECTRA.shape[1]
             CRPIX = data.CRPIX1[ii]
             if useFreq:
@@ -230,6 +234,7 @@ def velo_iterator(data,linefreq=None,useFreq=True, subvframe=True):
                 CDELT = data.CDELT1[ii]
                 velo = (np.arange(npix)+1-CRPIX)*CDELT + CRVAL
         elif hasattr(data,'DATA'):
+            # tested on GBT data
             npix = data.DATA.shape[1]
             #restfreq = data.RESTFREQ[ii]
             obsfreq = data.OBSFREQ[ii]
@@ -260,10 +265,25 @@ def velo_iterator(data,linefreq=None,useFreq=True, subvframe=True):
                 velo = (np.arange(npix)+1-CRPIX)*CDELT + CRVAL
         yield velo
 
+def freq_iterator(data, **kwargs):
+    """
+    Yield a frequency axis array
+    """
+    npix = data.DATA.shape[1]
+    arr = np.arange(npix)
+
+    for ii in range(data.CRPIX1.shape[0]):
+        CDELT = data.CDELT1[ii]
+        CRPIX = data.CRPIX1[ii]
+        CRVAL = data.CRVAL1[ii]
+        freq = (arr+1-CRPIX)*CDELT + CRVAL
+        yield freq
+
 
 
 def selectsource(data, sampler, sourcename=None, obsmode=None, scanrange=[],
                  feednum=1):
+    raise DeprecationWarning("This is out of date; the selection is incorporated into calibration now.")
 
     samplers = np.unique(data['SAMPLER'])
     if isinstance(sampler,int):
