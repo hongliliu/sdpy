@@ -288,8 +288,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
                  .format(sampler,feednum, OK.sum(), OKsource.sum(),
                          sourcename))
 
-    CalOff = (data['CAL']=='F')
-    CalOn  = (data['CAL']=='T')
+    CalOff = (data['CAL']=='F') & OK
+    CalOn  = (data['CAL']=='T') & OK
 
     speclen = dataarr.shape[1]
 
@@ -555,9 +555,13 @@ def cal_loop_lowfreq(data, dataarr, newdatadict, OKsource, CalOn, CalOff,
 
     calOnInds = np.nonzero(OKsource&CalOn)[0]
     calOffInds = np.nonzero(OKsource&CalOff)[0]
+    nON,nOFF = len(calOnInds), len(calOffInds)
+    if nON != nOFF:
+        raise ValueError("Number of cal diode 'on' scans does not match "
+                         "number of 'off' scans")
 
-    log.debug("Looping over {0} cal-on and {1} cal-off scans".format(len(calOnInds), len(calOffInds)))
-    for specindOn,specindOff in zip(calOnInds, calOffInds):
+    log.debug("Looping over {0} cal-on and {1} cal-off scans".format(nON, nOFF))
+    for specindOn,specindOff in ProgressBar(zip(calOnInds, calOffInds)):
 
         for K in namelist:
             if K != 'DATA':
