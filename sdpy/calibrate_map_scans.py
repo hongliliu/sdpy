@@ -405,9 +405,9 @@ def compute_tsys(data, tsysmethod='perscan', OKsource=None, OK=None,
     if tsysmethod == 'perscan':
         # compute TSYS on a scan-by-scan basis to avoid problems with saturated
         # TSYS.
-        scannumbers = np.unique(data['SCAN'][OKsource])
+        scannumbers = np.unique(data['SCAN'][OKsource & isfinite])
         for scanid in scannumbers:
-            whscan = (data['SCAN'] == scanid) & OK
+            whscan = (data['SCAN'] == scanid) & OK & isfinite
 
             on_data = dataarr[whscan & CalOn,exslice]
             off_data = dataarr[whscan & CalOff,exslice]
@@ -434,6 +434,9 @@ def compute_tsys(data, tsysmethod='perscan', OKsource=None, OK=None,
         tsys = (offmean / diffmean * tcal + tcal/2.0)
         data['TSYS'][CalOn & OKsource] = tsys
         data['TSYS'][CalOff & OKsource] = tsys
+
+    if np.any(np.isnan(data['TSYS'])):
+        raise ValueError("NaNs in TSYS")
 
     return data['TSYS']
 
