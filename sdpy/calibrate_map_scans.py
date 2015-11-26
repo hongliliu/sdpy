@@ -255,8 +255,10 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
     if np.count_nonzero(OK) == 0:
         raise ValueError("No matches to sampler {0} and feed {1}"
                          .format(sampler, feednum))
-    OK &= np.isfinite(data['DATA'].sum(axis=1))
-    if np.count_nonzero(OK) == 0:
+    # This can result in an asymmetric # of on/off scans, which sucks.
+    #OK &= np.isfinite(data['DATA'].sum(axis=1))
+    isfinite = np.isfinite(data['DATA'].sum(axis=1))
+    if np.count_nonzero(isfinite) == 0:
         raise ValueError("There is no finite data.")
     OKsource = OK.copy()
     if sourcename is not None:
@@ -302,7 +304,7 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
         if not highfreq:
             # split into two steps for readability
             temp_ref = get_reference(data, refscans, CalOn=CalOn, CalOff=CalOff,
-                                     exslice=exslice, OK=OK)
+                                     exslice=exslice, OK=OK, isfinite=isfinite)
             LSTrefs, refarray, ref_cntstoK, tsysref = temp_ref
         else:
             LSTrefs, refarray = get_reference_highfreq(data, refscans, OK=OK)
@@ -325,7 +327,7 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
     if tsys is None:
         compute_tsys(data, tsysmethod=tsysmethod, OKsource=OKsource, OK=OK,
                      CalOn=CalOn, CalOff=CalOff, exslice=exslice,
-                     verbose=verbose)
+                     verbose=verbose, isfinite=isfinite)
     else:
         data['TSYS'] = tsys
     if np.any(np.isnan(data['TSYS'])):
@@ -339,7 +341,9 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
                                                         CalOn=CalOn,
                                                         CalOff=CalOff,
                                                         exslice=exslice,
-                                                        airmass_method=airmass_method)
+                                                        airmass_method=airmass_method,
+                                                        isfinite=isfinite,
+                                                       )
         if verbose:
             log.info("EXPERIMENTAL: min_scale_reference = {0}".format(ref_scale))
 
@@ -353,7 +357,7 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
                                        CalOff, speclen, airmass_method,
                                        LSTrefs, min_scale_reference, exslice,
                                        tatm, tauz, refscans, namelist,
-                                       refarray, off_template)
+                                       refarray, off_template, isfinite)
     log.debug("newdatadict has length {0}, and its data entry has length {1}".format(len(newdatadict), len(newdatadict['DATA'])))
 
     # how do I get the "Format" for the column definitions?
@@ -379,7 +383,8 @@ def calibrate_cube_data(filename, outfilename, scanrange=[],
 
 
 def compute_tsys(data, tsysmethod='perscan', OKsource=None, OK=None,
-                 CalOn=None, CalOff=None, verbose=False, exslice=slice(None)):
+                 CalOn=None, CalOff=None, verbose=False, exslice=slice(None),
+                 isfinite=isfinite):
     """
     Calculate the TSYS vector for a set of scans
 
@@ -388,9 +393,9 @@ def compute_tsys(data, tsysmethod='perscan', OKsource=None, OK=None,
 
     """
     if CalOn is None:
-        CalOn  = (data['CAL']=='T') & OK
+        CalOn  = (data['CAL']=='T') & OK & isfinite
     if CalOff is None:
-        CalOff = (data['CAL']=='F') & OK
+        CalOff = (data['CAL']=='F') & OK & isfinite
 
     dataarr = data['DATA']
 
@@ -447,12 +452,13 @@ def elev_to_airmass(elev, method='maddalena'):
 
 def get_min_scale_reference(data, min_scale_reference, OKsource=None,
                             CalOn=None, CalOff=None, verbose=False,
-                            exslice=slice(None), airmass_method='maddalena'):
+                            exslice=slice(None), airmass_method='maddalena',
+                            isfinite=None):
 
     if CalOn is None:
-        CalOn  = (data['CAL']=='T')
+        CalOn  = (data['CAL']=='T') & isfinite
     if CalOff is None:
-        CalOff = (data['CAL']=='F')
+        CalOff = (data['CAL']=='F') & isfinite
 
     min_tsys = np.argmin(data['TSYS'][OKsource])
     whmin = data['SCAN'][OKsource][min_tsys]
@@ -495,7 +501,7 @@ def get_reference_highfreq(data, refscans, OK=None):
     return LSTrefs, refarray
 
 def get_reference(data, refscans, CalOn=None, CalOff=None,
-                  exslice=slice(None), OK=None):
+                  exslice=slice(None), OK=None, isfinite=None):
     """
     Extract the reference scans from the data.
 
@@ -512,6 +518,8 @@ def get_reference(data, refscans, CalOn=None, CalOff=None,
         Slice along the spectral axis for computing means
     OK: boolean array
         Mandatory.  All valid spectra for the specified feed and sampler
+    isfinite: boolean array
+        The spectra that have finite values (not flagged/nan'd)
     """
     if CalOn is None:
         CalOn  = (data['CAL']=='T')
@@ -524,7 +532,7 @@ def get_reference(data, refscans, CalOn=None, CalOff=None,
     refarray = np.zeros([len(refscans),speclen])
     LSTrefs  = np.zeros([len(refscans)])
     for II,refscan in enumerate(refscans):
-        OKref = OK & (refscan == data['SCAN'])
+        OKref = OK & (refscan == data['SCAN']) & isfinite
         if np.count_nonzero(OKref) == 0:
             raise ValueError("No 'OK' data for scan {0}".format(refscan))
         # use "where" in case that reduces amount of stuff read in...
@@ -551,7 +559,7 @@ def get_reference(data, refscans, CalOn=None, CalOff=None,
 def cal_loop_lowfreq(data, dataarr, newdatadict, OKsource, CalOn, CalOff,
                      speclen, airmass_method, LSTrefs, min_scale_reference,
                      exslice, tatm, tauz, refscans, namelist, refarray,
-                     off_template):
+                     off_template, isfinite):
 
     calOnInds = np.nonzero(OKsource&CalOn)[0]
     calOffInds = np.nonzero(OKsource&CalOff)[0]
@@ -562,6 +570,13 @@ def cal_loop_lowfreq(data, dataarr, newdatadict, OKsource, CalOn, CalOff,
 
     log.debug("Looping over {0} cal-on and {1} cal-off scans".format(nON, nOFF))
     for specindOn,specindOff in ProgressBar(zip(calOnInds, calOffInds)):
+
+        if not isfinite[specindOn]:
+            log.debug("Skipping entry {0},{1} because of NaNs in On".format(specindOn, specindOff))
+            continue
+        elif not isfinite[specindOff]:
+            log.debug("Skipping entry {0},{1} because of NaNs in Off".format(specindOn, specindOff))
+            continue
 
         for K in namelist:
             if K != 'DATA':
