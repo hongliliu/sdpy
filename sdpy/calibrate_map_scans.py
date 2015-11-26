@@ -566,13 +566,15 @@ def cal_loop_lowfreq(data, dataarr, newdatadict, OKsource, CalOn, CalOff,
 
     # cache data locally: one-time read from file to speed things up
     local_data = data[OKsource&(CalOn|CalOff)]
+    local_dataarr = local_data['DATA']
 
     # shrink OKsource, CalOn, CalOff
     OKsource_ = OKsource[OKsource&(CalOn|CalOff)]
     CalOn_ = CalOn[OKsource&(CalOn|CalOff)]
     CalOff_ = CalOff[OKsource&(CalOn|CalOff)]
+    isfinite_ = isfinite[OKsource&(CalOn|CalOff)]
 
-    OKsource,CalOn,CalOff = OKsource_,CalOn_,CalOff_
+    OKsource,CalOn,CalOff,isfinite = OKsource_,CalOn_,CalOff_,isfinite_
 
     calOnInds = np.nonzero(OKsource&CalOn)[0]
     calOffInds = np.nonzero(OKsource&CalOff)[0]
@@ -586,15 +588,17 @@ def cal_loop_lowfreq(data, dataarr, newdatadict, OKsource, CalOn, CalOff,
     for specindOn,specindOff in ProgressBar(zip(calOnInds, calOffInds)):
 
         if not isfinite[specindOn]:
-            log.debug("Skipping entry {0},{1} because of NaNs in On".format(specindOn, specindOff))
+            log.debug("Skipping entry {0},{1} because there are"
+                      " NaNs in On".format(specindOn, specindOff))
             continue
         elif not isfinite[specindOff]:
-            log.debug("Skipping entry {0},{1} because of NaNs in Off".format(specindOn, specindOff))
+            log.debug("Skipping entry {0},{1} because there are"
+                      " NaNs in Off".format(specindOn, specindOff))
             continue
 
         for K in namelist:
             if K != 'DATA':
-                newdatadict[K].append(data[K][specindOn])
+                newdatadict[K].append(local_data[K][specindOn])
             else:
                 # should this be speclen or 4096?  Changing to speclen...
                 # No need to really populate this here, though: it will be
@@ -602,14 +606,14 @@ def cal_loop_lowfreq(data, dataarr, newdatadict, OKsource, CalOn, CalOff,
                 newdatadict['DATA'].append([])
 
         # http://www.gb.nrao.edu/~rmaddale/Weather/
-        elev = data['ELEVATIO'][specindOn]
+        elev = local_data['ELEVATIO'][specindOn]
         airmass = elev_to_airmass(elev,
                                   method=airmass_method)
 
-        specOn = dataarr[specindOn,:]
-        specOff = dataarr[specindOff,:]
+        specOn = local_dataarr[specindOn,:]
+        specOff = local_dataarr[specindOff,:]
         spec = (specOn + specOff)/2.0
-        LSTspec = data['LST'][specindOn]
+        LSTspec = local_data['LST'][specindOn]
 
         # this "if" test is no longer necessary
         if refscans is not None:
@@ -650,7 +654,7 @@ def cal_loop_lowfreq(data, dataarr, newdatadict, OKsource, CalOn, CalOff,
             # exclude spectral ends when ratio-ing
             specRef = off_template * specRef[exslice].mean() / off_template[exslice].mean()
 
-        tsys = data['TSYS'][specindOn]
+        tsys = local_data['TSYS'][specindOn]
 
         # I don't think this is right... the correct way is to make sure
         # specRef moves with Spec
