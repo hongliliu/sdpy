@@ -692,11 +692,15 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
     log.info("Completed 'add_data' loop for"
              " {0} in {1}s".format(cubefilename, time.time()-t0))
 
+    if data.dtype.names is not None:
+        dname = 'DATA' if 'DATA' in data.dtype.names else 'SPECTRA'
+    else:
+        dname = slice(None)
+
     if excludefitrange is not None:
         # this block redefining "include" is used for diagnostics (optional)
         ind1a = np.argmin(np.abs(np.floor(v1-velo)))
         ind2a = np.argmin(np.abs(np.ceil(v4-velo)))+1
-        dname = 'DATA' if 'DATA' in data.dtype.names else 'SPECTRA'
         OK = (data[dname][0,:]==data[dname][0,:])
         OK[:ind1a] = False
         OK[ind2a:] = False
@@ -714,7 +718,6 @@ def add_data_to_cube(cubefilename, data=None, filename=None, fileheader=None,
         if include.sum() == 0:
             raise ValueError("All data excluded.")
     else:
-        dname = 'DATA' if 'DATA' in data.dtype.names else 'SPECTRA'
         include = slice(None)
 
 
