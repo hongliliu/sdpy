@@ -70,6 +70,8 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
         header.set('CRPIX2',(naxis2+1.)/2)
         header.set('CRVAL1',centerx)
         header.set('CRVAL2',centery)
+    else:
+        raise ValueError("Invalid coordinate system: {0}".format(coordsys))
     header.set('BMAJ',bmaj)
     header.set('BMIN',bmin)
     if crpix3 is None:
@@ -94,7 +96,7 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
     del header['NAXIS3']
     del header['CRPIX3']
     del header['CRVAL3']
-    del header['CDELT3' ]
+    del header['CDELT3']
     del header['CTYPE3']
     del header['CUNIT3']
     header.totextfile(output_flatheader,clobber=clobber)
