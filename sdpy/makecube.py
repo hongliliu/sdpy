@@ -63,7 +63,7 @@ def generate_header(centerx, centery, naxis1=64, naxis2=64, naxis3=4096,
         header.set('CRVAL2',0)
         header.set('CRPIX1',(naxis1+1.)/2)
         header.set('CRPIX2',(naxis2+1.)/2-centery/header['CDELT2'])
-    if coordsys in ('celestial','radec'):
+    if coordsys in ('celestial','radec','fk5','icrs'):
         header.set('CTYPE1','RA---TAN')
         header.set('CTYPE2','DEC--TAN')
         header.set('CRPIX1',(naxis1+1.)/2)
