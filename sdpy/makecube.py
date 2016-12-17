@@ -194,9 +194,11 @@ def coord_iterator(data,coordsys_out='galactic'):
                                        unit=('deg','deg'),
                                        frame='icrs')
             lon,lat = pos.galactic.l.deg, pos.galactic.b.deg
-        elif (coordsys_out in ('celestial','radec') or
+        elif (coordsys_out in ('celestial','radec','fk5','icrs') or
               coordsys_in==coordsys_out):
             lon,lat = data.CRVAL2,data.CRVAL3
+        else:
+            raise ValueError("Invalid coordinate system {0}".format(coordsys))
     else:
         raise Exception("No CRVAL or GLON struct in data.")
 
